@@ -120,6 +120,10 @@ export interface NsisOptions {
    If `warningsAsErrors` is `false`: NSIS will allow warnings.
    */
   readonly warningsAsErrors?: boolean
+
+  readonly keepArchives?: boolean
+
+  readonly defines?: any
 }
 
 /*

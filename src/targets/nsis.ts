@@ -71,7 +71,9 @@ export default class NsisTarget extends TargetEx {
       await this.buildInstaller()
     }
     finally {
-      await BluebirdPromise.map(this.archs.values(), it => unlink(it))
+      if (!this.options.keepArchives) {
+        await BluebirdPromise.map(this.archs.values(), it => unlink(it))
+      }
     }
   }
 
@@ -189,6 +191,8 @@ export default class NsisTarget extends TargetEx {
 
     const customScriptPath = await this.packager.getResource(this.options.script, "installer.nsi")
     const script = await readFile(customScriptPath || path.join(this.nsisTemplatesDir, "installer.nsi"), "utf8")
+
+    Object.assign(defines, this.options.defines)
 
     if (customScriptPath == null) {
       const uninstallerPath = await packager.getTempFile("uninstaller.exe")
