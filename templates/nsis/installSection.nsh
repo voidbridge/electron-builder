@@ -103,14 +103,18 @@ ${endif}
 
 SetOutPath $INSTDIR
 
-SetCompress off
-!ifdef APP_32
-  File /oname=$PLUGINSDIR\app-32.7z "${APP_32}"
+!ifmacrodef customFiles
+  !insertmacro customFiles
+!else
+  SetCompress off
+  !ifdef APP_32
+    File /oname=$PLUGINSDIR\app-32.7z "${APP_32}"
+  !endif
+  !ifdef APP_64
+    File /oname=$PLUGINSDIR\app-64.7z "${APP_64}"
+  !endif
+  SetCompress "${COMPRESS}"
 !endif
-!ifdef APP_64
-  File /oname=$PLUGINSDIR\app-64.7z "${APP_64}"
-!endif
-SetCompress "${COMPRESS}"
 
 !ifdef APP_64
   ${if} ${RunningX64}
