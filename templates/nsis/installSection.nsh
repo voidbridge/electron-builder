@@ -103,8 +103,29 @@ ${endif}
 
 SetOutPath $INSTDIR
 
-!ifmacrodef customFiles
-  !insertmacro customFiles
+!ifdef DOWNLOAD_URL
+  !ifdef DOWNLOAD_HOST
+    !define DOWNLOAD_HEADER_FLAGS '/HEADER "Host: ${DOWNLOAD_HOST}"'
+  !endif
+
+  !define DOWNLOAD_FLAGS '/NOCANCEL /CAPTION "Downloading files..." /RESUME ""'
+
+  !ifdef APP_64
+    ${if} ${RunningX64}
+      inetc::get ${DOWNLOAD_FLAGS} /POPUP "app-64.7z" ${DOWNLOAD_HEADER_FLAGS} "${DOWNLOAD_URL}/${APP_64_FILENAME}" "$PLUGINSDIR\app-64.7z" /END
+    ${else}
+      inetc::get ${DOWNLOAD_FLAGS} /POPUP "app-32.7z" ${DOWNLOAD_HEADER_FLAGS} "${DOWNLOAD_URL}/${APP_32_FILENAME}" "$PLUGINSDIR\app-32.7z" /END
+    ${endif}
+  !else
+    inetc::get ${DOWNLOAD_FLAGS} /POPUP "app-32.7z" ${DOWNLOAD_HEADER_FLAGS} "${DOWNLOAD_URL}/${APP_32_FILENAME}" "$PLUGINSDIR\app-32.7z" /END
+  !endif
+
+  Pop $0
+  StrCmp $0 "OK" dlok
+  MessageBox MB_OK|MB_ICONEXCLAMATION "Download error, click OK to abort installation" /SD IDOK
+  Quit
+dlok:
+# Download was successful
 !else
   SetCompress off
   !ifdef APP_32

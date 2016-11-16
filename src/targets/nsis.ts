@@ -71,7 +71,7 @@ export default class NsisTarget extends TargetEx {
       await this.buildInstaller()
     }
     finally {
-      if (!this.options.keepArchives) {
+      if (this.options.downloadUrl == null) {
         await BluebirdPromise.map(this.archs.values(), it => unlink(it))
       }
     }
@@ -106,7 +106,9 @@ export default class NsisTarget extends TargetEx {
     }
 
     for (let [arch, file] of this.archs) {
-      defines[arch === Arch.x64 ? "APP_64" : "APP_32"] = await file
+      let filePath = await file
+      defines[arch === Arch.x64 ? "APP_64" : "APP_32"] = filePath
+      defines[arch === Arch.x64 ? "APP_64_FILENAME" : "APP_32_FILENAME"] = path.basename(filePath);
     }
 
     const oneClick = this.options.oneClick !== false
@@ -192,8 +194,6 @@ export default class NsisTarget extends TargetEx {
     const customScriptPath = await this.packager.getResource(this.options.script, "installer.nsi")
     const script = await readFile(customScriptPath || path.join(this.nsisTemplatesDir, "installer.nsi"), "utf8")
 
-    Object.assign(defines, this.options.defines)
-
     if (customScriptPath == null) {
       const uninstallerPath = await packager.getTempFile("uninstaller.exe")
       const isWin = process.platform === "win32"
@@ -249,6 +249,21 @@ export default class NsisTarget extends TargetEx {
     }
 
     packager.dispatchArtifactCreated(installerPath, githubArtifactName)
+
+    if (this.options.downloadUrl != null) {
+      defines.DOWNLOAD_URL = this.options.downloadUrl;
+
+      if (this.options.downloadHost != null) {
+        defines.DOWNLOAD_HOST = this.options.downloadHost;
+      }
+
+      const downloaderFilename = `${appInfo.productFilename} Downloader ${version}.exe`
+      const downloaderPath = path.join(this.outDir, downloaderFilename)
+
+      commands.OutFile = `"${downloaderPath}"`;
+      await subTask(`Executing makensis — downloader`, this.executeMakensis(defines, commands, true, script))
+      await packager.sign(downloaderPath)
+    }
   }
 
   private async executeMakensis(defines: any, commands: any, isInstaller: boolean, originalScript: string) {

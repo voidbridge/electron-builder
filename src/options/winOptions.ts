@@ -121,9 +121,9 @@ export interface NsisOptions {
    */
   readonly warningsAsErrors?: boolean
 
-  readonly keepArchives?: boolean
+  readonly downloadUrl?: string
 
-  readonly defines?: any
+  readonly downloadHost?: string
 }
 
 /*
