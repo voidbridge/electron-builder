@@ -251,7 +251,7 @@ export default class NsisTarget extends TargetEx {
     packager.dispatchArtifactCreated(installerPath, githubArtifactName)
 
     if (this.options.downloadUrl != null) {
-      defines.DOWNLOAD_URL = this.options.downloadUrl;
+      defines.DOWNLOAD_URL = this.options.downloadUrl.replace("{{version}}", version);
 
       if (this.options.downloadHost != null) {
         defines.DOWNLOAD_HOST = this.options.downloadHost;
