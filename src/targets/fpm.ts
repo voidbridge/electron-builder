@@ -1,5 +1,5 @@
 import { Arch } from "../metadata"
-import { smarten, TargetEx } from "../platformPackager"
+import { smarten, Target } from "../platformPackager"
 import { use, exec } from "../util/util"
 import * as path from "path"
 import { getBin } from "../util/binDownload"
@@ -28,7 +28,7 @@ function downloadFpm(): Promise<string> {
     .then(it => path.join(it, "fpm"))
 }
 
-export default class FpmTarget extends TargetEx {
+export default class FpmTarget extends Target {
   private readonly options = Object.assign({}, this.packager.platformSpecificBuildOptions, (<any>this.packager.devMetadata.build)[this.name])
 
   private readonly scriptFiles: Promise<Array<string>>
@@ -99,7 +99,7 @@ export default class FpmTarget extends TargetEx {
       "--force",
       "--after-install", scripts[0],
       "--after-remove", scripts[1],
-      "--description", smarten(target === "rpm" ? options.description! : `${synopsis || ""}\n ${options.description}`),
+      "--description", smarten(target === "rpm" ? this.helper.getDescription(options)! : `${synopsis || ""}\n ${this.helper.getDescription(options)}`),
       "--maintainer", author,
       "--vendor", options.vendor || author,
       "--version", appInfo.version,

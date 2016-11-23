@@ -1,14 +1,13 @@
 import { Platform, Arch } from "out"
-import test from "./helpers/avaEx"
-import { assertPack, getTestAsset, app } from "./helpers/packTester"
+import { assertPack, getTestAsset, app } from "../helpers/packTester"
 import { copy, outputFile, readFile } from "fs-extra-p"
 import * as path from "path"
 import BluebirdPromise from "bluebird-lst-c"
-import { assertThat } from "./helpers/fileAssert"
+import { assertThat } from "../helpers/fileAssert"
 import { extractFile } from "asar-electron-builder"
 import { walk } from "out/asarUtil"
-import { nsisPerMachineInstall } from "./helpers/expectedContents"
-import { WineManager, diff } from "./helpers/wine"
+import { nsisPerMachineInstall } from "../helpers/expectedContents"
+import { WineManager, diff } from "../helpers/wine"
 import { safeLoad } from "js-yaml"
 
 const nsisTarget = Platform.WINDOWS.createTarget(["nsis"])
@@ -113,8 +112,8 @@ async function doTest(outDir: string, perUser: boolean) {
   let fsAfter = await listFiles()
 
   let fsChanges = diff(fsBefore, fsAfter, driveC)
-  assertThat(fsChanges.added).isEqualTo(nsisPerMachineInstall)
-  assertThat(fsChanges.deleted).isEqualTo([])
+  expect(fsChanges.added).toEqual(nsisPerMachineInstall)
+  expect(fsChanges.deleted).toEqual([])
 
   // run installer again to test uninstall
   const appDataFile = path.join(wine.userDir, "Application Data", "TestApp", "doNotDeleteMe")
@@ -124,8 +123,8 @@ async function doTest(outDir: string, perUser: boolean) {
   fsAfter = await listFiles()
 
   fsChanges = diff(fsBefore, fsAfter, driveC)
-  assertThat(fsChanges.added).isEqualTo([])
-  assertThat(fsChanges.deleted).isEqualTo([])
+  expect(fsChanges.added).toEqual([])
+  expect(fsChanges.deleted).toEqual([])
 
   await assertThat(appDataFile).isFile()
 
@@ -133,45 +132,13 @@ async function doTest(outDir: string, perUser: boolean) {
   await assertThat(appDataFile).doesNotExist()
 }
 
-test.ifNotCiOsx("boring", app({
-  targets: nsisTarget,
-  devMetadata: {
-    build: {
-      nsis: {
-        oneClick: false,
-        language: "1031",
-      },
-      win: {
-        legalTrademarks: "My Trademark"
-      },
-    }
-  }
-}, {
-  signed: true,
-  projectDirCreated: projectDir => {
-    return copy(getTestAsset("license.txt"), path.join(projectDir, "build", "license.txt"))
-  },
-}))
-
-test.ifNotCiOsx("boring, only perMachine", app({
-  targets: nsisTarget,
-  devMetadata: {
-    build: {
-      nsis: {
-        oneClick: false,
-        perMachine: true,
-      }
-    }
-  }
-}))
-
-test.ifNotCiOsx("installerHeaderIcon", () => {
+test.ifNotCiMac("installerHeaderIcon", () => {
   let headerIconPath: string | null = null
   return assertPack("test-app-one", {
       targets: nsisTarget,
       effectiveOptionComputed: options => {
         const defines = options[0]
-        assertThat(defines.HEADER_ICO).isEqualTo(headerIconPath)
+        expect(defines.HEADER_ICO).toEqual(headerIconPath)
         return false
       }
     }, {
@@ -179,63 +146,6 @@ test.ifNotCiOsx("installerHeaderIcon", () => {
         headerIconPath = path.join(projectDir, "build", "installerHeaderIcon.ico")
         return copy(getTestAsset("headerIcon.ico"), headerIconPath)
       }
-    }
-  )
-})
-
-test.ifNotCiOsx("boring, MUI_HEADER", () => {
-  let installerHeaderPath: string | null = null
-  return assertPack("test-app-one", {
-      targets: nsisTarget,
-      devMetadata: {
-        build: {
-          nsis: {
-            oneClick: false,
-          }
-        }
-      },
-      effectiveOptionComputed: options => {
-        const defines = options[0]
-        assertThat(defines.MUI_HEADERIMAGE).isEqualTo(null)
-        assertThat(defines.MUI_HEADERIMAGE_BITMAP).isEqualTo(installerHeaderPath)
-        assertThat(defines.MUI_HEADERIMAGE_RIGHT).isEqualTo(null)
-        // speedup, do not build - another MUI_HEADER test will test build
-        return true
-      }
-    }, {
-      projectDirCreated: projectDir => {
-        installerHeaderPath = path.join(projectDir, "build", "installerHeader.bmp")
-        return copy(getTestAsset("installerHeader.bmp"), installerHeaderPath)
-      }
-    }
-  )
-})
-
-test.ifNotCiOsx("boring, MUI_HEADER as option", () => {
-  let installerHeaderPath: string | null = null
-  return assertPack("test-app-one", {
-      targets: Platform.WINDOWS.createTarget(["nsis"], Arch.ia32, Arch.x64),
-      devMetadata: {
-        build: {
-          nsis: {
-            oneClick: false,
-            installerHeader: "foo.bmp"
-          }
-        }
-      },
-      effectiveOptionComputed: options => {
-        const defines = options[0]
-        assertThat(defines.MUI_HEADERIMAGE).isEqualTo(null)
-        assertThat(defines.MUI_HEADERIMAGE_BITMAP).isEqualTo(installerHeaderPath)
-        assertThat(defines.MUI_HEADERIMAGE_RIGHT).isEqualTo(null)
-        // test that we can build such installer
-        return false
-      }
-    }, {
-      projectDirCreated: projectDir => {
-        installerHeaderPath = path.join(projectDir, "foo.bmp")
-        return copy(getTestAsset("installerHeader.bmp"), installerHeaderPath)
-      },
     }
   )
 })

@@ -1,5 +1,7 @@
-import test from "./helpers/avaEx"
-import { assertPack, modifyPackageJson, platform, getPossiblePlatforms, app, appThrows, packageJson } from "./helpers/packTester"
+import {
+  assertPack, modifyPackageJson, getPossiblePlatforms, app, appThrows, packageJson,
+  appTwoThrows, allPlatforms
+} from "./helpers/packTester"
 import { move, outputJson } from "fs-extra-p"
 import BluebirdPromise from "bluebird-lst-c"
 import * as path from "path"
@@ -10,7 +12,7 @@ import { createYargs } from "out/cliOptions"
 import { extractFile } from "asar-electron-builder"
 import { ELECTRON_VERSION } from "./helpers/config"
 
-test("cli", () => {
+test("cli", async () => {
   const yargs = createYargs()
 
   function expected(opt: BuildOptions): any {
@@ -82,80 +84,21 @@ test("custom output dir", app(allPlatforms(false), {
   }
 }))
 
-test("build in the app package.json", t => t.throws(assertPack("test-app", allPlatforms(), {
+test("build in the app package.json", appTwoThrows(/'build' in the application package\.json .+/, allPlatforms(), {
   projectDirCreated: it => modifyPackageJson(it, data => {
     data.build = {
       "iconUrl": "bar",
     }
   }, true)
-}), /'build' in the application package\.json .+/))
+}))
 
 test("name in the build", appThrows(/'name' in the 'build' is forbidden/, currentPlatform(), {projectDirCreated: packageJson(it => it.build = {"name": "Cool App"})}))
 
 // this test also test appMetadata, so, we must use test-app here
-test("empty description", t => t.throws(assertPack("test-app", {
+test("empty description", appTwoThrows(/Please specify 'description'/, {
   targets: Platform.LINUX.createTarget(),
   appMetadata: <any>{
     description: "",
-  }
-}), /Please specify 'description'/))
-
-test("invalid main in the app package.json", t => t.throws(assertPack("test-app", allPlatforms(false), {
-  projectDirCreated: projectDir => modifyPackageJson(projectDir, data => {
-    data.main = "main.js"
-  }, true)
-}), /Application entry file "main.js" in the /))
-
-test("invalid main in the app package.json (no asar)", t => t.throws(assertPack("test-app", allPlatforms(false), {
-  projectDirCreated: projectDir => {
-    return BluebirdPromise.all([
-      modifyPackageJson(projectDir, data => {
-        data.main = "main.js"
-      }, true),
-      modifyPackageJson(projectDir, data => {
-        data.build.asar = false
-      })
-    ])
-  }
-}), `Application entry file "main.js" does not exist. Seems like a wrong configuration.`))
-
-test("invalid main in the app package.json (custom asar)", t => t.throws(assertPack("test-app", allPlatforms(false), {
-  projectDirCreated: projectDir => {
-    return BluebirdPromise.all([
-      modifyPackageJson(projectDir, data => {
-        data.main = "path/app.asar/main.js"
-      }, true),
-      modifyPackageJson(projectDir, data => {
-        data.build.asar = false
-      })
-    ])
-  }
-}), /Application entry file "main.js" in the ("[^"]*") does not exist\. Seems like a wrong configuration\./))
-
-test("main in the app package.json (no asar)", () => assertPack("test-app", allPlatforms(false), {
-  projectDirCreated: projectDir => {
-    return BluebirdPromise.all([
-      move(path.join(projectDir, "app", "index.js"), path.join(projectDir, "app", "main.js")),
-      modifyPackageJson(projectDir, data => {
-        data.main = "main.js"
-      }, true),
-      modifyPackageJson(projectDir, data => {
-        data.build.asar = false
-      })
-    ])
-  }
-}))
-
-test("main in the app package.json (custom asar)", () => assertPack("test-app", allPlatforms(false), {
-  projectDirCreated: projectDir => {
-    return BluebirdPromise.all([
-      modifyPackageJson(projectDir, data => {
-        data.main = "path/app.asar/index.js"
-      }, true),
-      modifyPackageJson(projectDir, data => {
-        data.build.asar = false
-      })
-    ])
   }
 }))
 
@@ -165,7 +108,7 @@ test("relative index", () => assertPack("test-app", allPlatforms(false), {
   }, true)
 }))
 
-test.ifDevOrLinuxCi("electron version from electron-prebuilt dependency", app({
+it.ifDevOrLinuxCi("electron version from electron-prebuilt dependency", app({
   targets: Platform.LINUX.createTarget(DIR_TARGET),
 }, {
   projectDirCreated: projectDir => BluebirdPromise.all([
@@ -206,7 +149,7 @@ test("www as default dir", () => assertPack("test-app", currentPlatform(), {
   projectDirCreated: projectDir => move(path.join(projectDir, "app"), path.join(projectDir, "www"))
 }))
 
-test("afterPack", t => {
+test("afterPack", () => {
   const targets = process.env.CI ? Platform.fromString(process.platform).createTarget(DIR_TARGET) : getPossiblePlatforms(DIR_TARGET)
   let called = 0
   return assertPack("test-app-one", {
@@ -221,82 +164,13 @@ test("afterPack", t => {
     }
   }, {
     packed: () => {
-      t.is(called, targets.size)
+      expect(called).toEqual(targets.size)
       return BluebirdPromise.resolve()
     }
   })
 })
 
-test.ifDevOrLinuxCi("extra metadata", () => {
-  const extraMetadata = {
-    foo: {
-      bar: 12,
-    },
-    build: {
-      linux: {
-        executableName: "NewName"
-      }
-    }
-  }
-  return assertPack("test-app-one", {
-    targets: Platform.LINUX.createTarget(DIR_TARGET),
-    extraMetadata: extraMetadata,
-  }, {
-    projectDirCreated: projectDir => modifyPackageJson(projectDir, data => {
-      data.foo = {
-        bar: 42,
-        existingProp: 22,
-      }
-    }),
-    packed: async context => {
-      await assertThat(path.join(context.getContent(Platform.LINUX), "NewName")).isFile()
-      assertThat(JSON.parse(extractFile(path.join(context.getResources(Platform.LINUX), "app.asar"), "package.json").toString())).hasProperties({
-        foo: {
-          bar: 12,
-          existingProp: 22,
-        }
-      })
-    }
-  })
-})
-
-test.ifDevOrLinuxCi("extra metadata - two", () => {
-  const extraMetadata = {
-    build: {
-      linux: {
-        executableName: "NewName"
-      }
-    }
-  }
-  return assertPack("test-app", {
-    targets: Platform.LINUX.createTarget(DIR_TARGET),
-    extraMetadata: extraMetadata,
-  }, {
-    packed: async context => {
-      await assertThat(path.join(context.getContent(Platform.LINUX), "NewName")).isFile()
-    }
-  })
-})
-
-test.ifOsx("extra metadata - override icon", t => t.throws((() => {
-  const extraMetadata = {
-    build: {
-      mac: {
-        icon: "dev"
-      }
-    },
-  }
-  return assertPack("test-app", {
-    targets: Platform.OSX.createTarget(DIR_TARGET),
-    extraMetadata: extraMetadata,
-  }, {
-    packed: async context => {
-      await assertThat(path.join(context.getContent(Platform.LINUX), "NewName")).isFile()
-    }
-  })
-})(), /ENOENT: no such file or directory/))
-
-// test.ifOsx("app-executable-deps", () => {
+// ifMac("app-executable-deps", () => {
 //   return assertPack("app-executable-deps", {
 //     targets: Platform.current().createTarget(DIR_TARGET),
 //   }, {
@@ -331,14 +205,6 @@ test.ifDevOrLinuxCi("smart unpack", () => {
     }
   })
 })
-
-test.ifWinCi("Build MacOS on Windows is not supported", appThrows(/Build for MacOS is supported only on MacOS.+/, platform(Platform.MAC)))
-
-function allPlatforms(dist: boolean = true): PackagerOptions {
-  return {
-    targets: getPossiblePlatforms(dist ? null : DIR_TARGET),
-  }
-}
 
 function currentPlatform(): PackagerOptions {
   return {
