@@ -12,6 +12,8 @@
       <w>appimage</w>
       <w>appleid</w>
       <w>appveyor</w>
+      <w>appx</w>
+      <w>appxmanifest</w>
       <w>archiver</w>
       <w>archs</w>
       <w>aspx</w>
@@ -21,19 +23,23 @@
       <w>awaiter</w>
       <w>bashism</w>
       <w>bintray</w>
+      <w>bootstrapper</w>
       <w>buildpack</w>
       <w>chown</w>
       <w>circleci</w>
       <w>clcerts</w>
       <w>cleanuper</w>
       <w>codesigning</w>
+      <w>controlfields</w>
       <w>coroutine</w>
       <w>cpus</w>
       <w>crypto</w>
       <w>cuint</w>
       <w>customfunction</w>
+      <w>dcterms</w>
       <w>debian</w>
       <w>depcheck</w>
+      <w>devel</w>
       <w>devmode</w>
       <w>difflet</w>
       <w>digester</w>
@@ -45,6 +51,7 @@
       <w>enoent</w>
       <w>eperm</w>
       <w>finishpage</w>
+      <w>flattennpmmodules</w>
       <w>fontconfig</w>
       <w>fseventsd</w>
       <w>github</w>
@@ -63,6 +70,7 @@
       <w>hicolor</w>
       <w>hkcu</w>
       <w>hklm</w>
+      <w>homedir</w>
       <w>hrtime</w>
       <w>icnsutils</w>
       <w>icnv</w>
@@ -99,7 +107,10 @@
       <w>lzip</w>
       <w>lzma</w>
       <w>lzop</w>
+      <w>macos</w>
       <w>macroend</w>
+      <w>makeappx</w>
+      <w>makecert</w>
       <w>makedeb</w>
       <w>makedmg</w>
       <w>makensis</w>
@@ -127,6 +138,7 @@
       <w>pkcs</w>
       <w>postinstall</w>
       <w>powerrequired</w>
+      <w>powershell</w>
       <w>prerelease</w>
       <w>productbuild</w>
       <w>progexe</w>
@@ -136,6 +148,7 @@
       <w>rcedit</w>
       <w>readpass</w>
       <w>regedit</w>
+      <w>releasify</w>
       <w>rels</w>
       <w>repos</w>
       <w>rimraf</w>
@@ -162,6 +175,7 @@
       <w>unmounting</w>
       <w>unorm</w>
       <w>unpage</w>
+      <w>userland</w>
       <w>userprofile</w>
       <w>valuename</w>
       <w>versioner</w>

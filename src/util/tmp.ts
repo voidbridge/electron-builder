@@ -15,7 +15,7 @@ export class TmpDir {
 
   private dir: string | null
 
-  getTempFile(suffix: string): BluebirdPromise<string> {
+  getTempFile(suffix: string | null): Promise<string> {
     if (this.tempDirectoryPromise == null) {
       let promise: BluebirdPromise<string>
       if (mkdtemp == null) {
@@ -52,7 +52,7 @@ export class TmpDir {
     }
 
     return this.tempDirectoryPromise
-      .then(it => path.join(it, `t-${process.pid.toString(16)}-${(this.tmpFileCounter++).toString(16)}${suffix.startsWith(".") ? suffix : `-${suffix}`}`))
+      .then(it => suffix == null ? it : path.join(it, `t-${process.pid.toString(16)}-${(this.tmpFileCounter++).toString(16)}${suffix.startsWith(".") ? suffix : `-${suffix}`}`))
   }
 
   cleanup(): Promise<any> {

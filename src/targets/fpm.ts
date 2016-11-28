@@ -1,15 +1,16 @@
 import { Arch } from "../metadata"
-import { smarten, Target } from "../platformPackager"
+import { smarten } from "../platformPackager"
 import { use, exec } from "../util/util"
 import * as path from "path"
 import { getBin } from "../util/binDownload"
-import {  readFile, outputFile } from "fs-extra-p"
+import { readFile, outputFile } from "fs-extra-p"
 import BluebirdPromise from "bluebird-lst-c"
 import { LinuxTargetHelper, installPrefix } from "./LinuxTargetHelper"
 import * as errorMessages from "../errorMessages"
 import { TmpDir } from "../util/tmp"
 import { LinuxPackager } from "../linuxPackager"
 import { log } from "../util/log"
+import { Target } from "./targetFactory"
 
 const template = require("lodash.template")
 
@@ -152,7 +153,7 @@ export default class FpmTarget extends Target {
     use(options.fpm, it => args.push(...<any>it))
 
     args.push(`${appOutDir}/=${installPrefix}/${appInfo.productFilename}`)
-    for (let mapping of (await this.helper.icons)) {
+    for (const mapping of (await this.helper.icons)) {
       args.push(mapping.join("=/usr/share/icons/hicolor/"))
     }
 

@@ -1,4 +1,3 @@
-import { Target } from "../platformPackager"
 import { Arch } from "../metadata"
 import * as path from "path"
 import { exec, unlinkIfExists } from "../util/util"
@@ -9,6 +8,7 @@ import BluebirdPromise from "bluebird-lst-c"
 import { v1 as uuid1 } from "uuid-1345"
 import { LinuxPackager } from "../linuxPackager"
 import { log } from "../util/log"
+import { Target } from "./targetFactory"
 
 const appImageVersion = process.platform === "darwin" ? "AppImage-09-07-16-mac" : "AppImage-09-07-16-linux"
 //noinspection SpellCheckingInspection
@@ -20,7 +20,7 @@ export default class AppImageTarget extends Target {
   private readonly options = Object.assign({}, this.packager.platformSpecificBuildOptions, (<any>this.packager.devMetadata.build)[this.name])
   private readonly desktopEntry: Promise<string>
 
-  constructor(private packager: LinuxPackager, private helper: LinuxTargetHelper, private outDir: string) {
+  constructor(ignored: string, private packager: LinuxPackager, private helper: LinuxTargetHelper, private outDir: string) {
     super("appImage")
 
     // we add X-AppImage-BuildId to ensure that new desktop file will be installed
@@ -41,6 +41,7 @@ export default class AppImageTarget extends Target {
     await unlinkIfExists(resultFile)
 
     const appImagePath = await appImagePathPromise
+    const desktopFile = await this.desktopEntry
     const args = [
       "-joliet", "on",
       "-volid", "AppImage",
@@ -49,9 +50,9 @@ export default class AppImageTarget extends Target {
       "-map", appOutDir, "/usr/bin",
       "-map", path.join(__dirname, "..", "..", "templates", "linux", "AppRun.sh"), "/AppRun",
       // we get executable name in the AppRun by desktop file name, so, must be named as executable
-      "-map", await this.desktopEntry, `/${this.packager.executableName}.desktop`,
+      "-map", desktopFile, `/${this.packager.executableName}.desktop`,
     ]
-    for (let [from, to] of (await this.helper.icons)) {
+    for (const [from, to] of (await this.helper.icons)) {
       args.push("-map", from, `/usr/share/icons/default/${to}`)
     }
 
@@ -64,6 +65,10 @@ export default class AppImageTarget extends Target {
     args.push("-chown_r", "0", "/", "--")
     args.push("-zisofs", `level=${packager.devMetadata.build.compression === "store" ? "0" : "9"}:block_size=128k:by_magic=off`)
     args.push("set_filter_r", "--zisofs", "/")
+
+    if (this.packager.options.effectiveOptionComputed != null && await this.packager.options.effectiveOptionComputed([args, desktopFile])) {
+      return
+    }
 
     await exec(process.arch === "x64" ? path.join(appImagePath, "xorriso") : "xorriso", args)
 
