@@ -1,5 +1,6 @@
 import * as https from "https"
-import { RequestOptions } from "https"
+import * as http from "http"
+import { RequestOptions } from "http"
 import { IncomingMessage, ClientRequest } from "http"
 import { addTimeOutHandler } from "../util/httpRequest"
 import BluebirdPromise from "bluebird-lst-c"
@@ -48,11 +49,11 @@ export function doApiRequest<T>(options: RequestOptions, token: string | null, r
   }
 
   return new BluebirdPromise<T>((resolve, reject, onCancel) => {
-    const request = https.request(options, (response: IncomingMessage) => {
+    const request = (options.protocol === "https:" ? https.request : http.request)(options, (response: IncomingMessage) => {
       try {
         if (response.statusCode === 404) {
           // error is clear, we don't need to read detailed error description
-          reject(new HttpError(response, `method: ${options.method} url: https://${options.hostname}${options.path}
+          reject(new HttpError(response, `method: ${options.method} url: ${options.protocol}://${options.hostname}${options.path}
 
 Please double check that your authentication token is correct. Due to security reasons actual status maybe not reported, but 404.
 `))
