@@ -15,7 +15,7 @@ Name "${PRODUCT_NAME}"
 !macro check64BitAndSetRegView
   !ifdef APP_64
     ${IfNot} ${AtLeastWin7}
-      MessageBox MB_OK "Windows 7 and above is required"
+      MessageBox MB_OK "$(OLD_WINDOWS)"
       Quit
     ${EndIf}
 

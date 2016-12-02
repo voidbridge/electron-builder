@@ -28,12 +28,12 @@
   ${if} $3 != "${APP_EXECUTABLE_FILENAME}"
     ${nsProcess::FindProcess} "${APP_EXECUTABLE_FILENAME}" $R0
     ${If} $R0 == 0
-      MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION "${PRODUCT_NAME} is running. $\r$\nClick OK to close it and continue with ${MODE}." /SD IDOK IDOK doStopProcess
+      MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION "$(APP_RUNNING_DIALOG)" /SD IDOK IDOK doStopProcess
         Quit
         doStopProcess:
-          DetailPrint "Closing running ${PRODUCT_NAME} ..."
+          DetailPrint "$(APP_RUNNING_CLOSING)"
           ${nsProcess::KillProcess} "${APP_EXECUTABLE_FILENAME}" $R0
-          DetailPrint "Waiting for ${PRODUCT_NAME} to close."
+          DetailPrint "$(APP_RUNNING_WAITING)"
           Sleep 2000
     ${EndIf}
     ${nsProcess::Unload}

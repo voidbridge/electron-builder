@@ -2,7 +2,7 @@ Function un.onInit
   !insertmacro check64BitAndSetRegView
 
   ${IfNot} ${Silent}
-    MessageBox MB_OKCANCEL "Are you sure you want to uninstall ${PRODUCT_NAME}?" IDOK +2
+    MessageBox MB_OKCANCEL "$(UNINSTALL_CONFIRM)" IDOK +2
     Quit
 
     !ifdef ONE_CLICK

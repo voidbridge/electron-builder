@@ -79,7 +79,7 @@ InitPluginsDir
 ${IfNot} ${Silent}
   SetDetailsPrint none
 
-  !ifdef ONE_CLICK
+  !ifdef ONE_CLICK & ONE_CLICK_SPIDER
     !ifdef HEADER_ICO
       SpiderBanner::Show /MODERN /ICON "$PLUGINSDIR\installerHeaderico.ico"
     !else
@@ -108,21 +108,22 @@ SetOutPath $INSTDIR
     !define DOWNLOAD_HEADER_FLAGS '/HEADER "Host: ${DOWNLOAD_HOST}"'
   !endif
 
-  !define DOWNLOAD_FLAGS '/NOCANCEL /CAPTION "Downloading files..." /RESUME ""'
+  !define DOWNLOAD_FLAGS '/NOCANCEL /CAPTION "$(DOWNLOAD_CAPTION)" /RESUME "$(DOWNLOAD_RESUME)"'
+  !define TRANSLATE_FLAG '/TRANSLATE "$(DOWNLOAD_URL)" "$(DOWNLOAD_DOWNLOADING)" "$(DOWNLOAD_CONNECTING)" "$(DOWNLOAD_FILE_NAME)" "$(DOWNLOAD_RECEIVED)" "$(DOWNLOAD_FILE_SIZE)" "$(DOWNLOAD_REMAINING_TIME)" "$(DOWNLOAD_TOTAL_TIME)"'
 
   !ifdef APP_64
     ${if} ${RunningX64}
-      inetc::get ${DOWNLOAD_FLAGS} /POPUP "app-64.7z" ${DOWNLOAD_HEADER_FLAGS} "${DOWNLOAD_URL}/${APP_64_FILENAME}" "$PLUGINSDIR\app-64.7z" /END
+      inetc::get ${DOWNLOAD_FLAGS} /POPUP "app-64.7z" ${DOWNLOAD_HEADER_FLAGS} ${TRANSLATE_FLAG} "${DOWNLOAD_URL}/${APP_64_FILENAME}" "$PLUGINSDIR\app-64.7z" /END
     ${else}
-      inetc::get ${DOWNLOAD_FLAGS} /POPUP "app-32.7z" ${DOWNLOAD_HEADER_FLAGS} "${DOWNLOAD_URL}/${APP_32_FILENAME}" "$PLUGINSDIR\app-32.7z" /END
+      inetc::get ${DOWNLOAD_FLAGS} /POPUP "app-32.7z" ${DOWNLOAD_HEADER_FLAGS} ${TRANSLATE_FLAG} "${DOWNLOAD_URL}/${APP_32_FILENAME}" "$PLUGINSDIR\app-32.7z" /END
     ${endif}
   !else
-    inetc::get ${DOWNLOAD_FLAGS} /POPUP "app-32.7z" ${DOWNLOAD_HEADER_FLAGS} "${DOWNLOAD_URL}/${APP_32_FILENAME}" "$PLUGINSDIR\app-32.7z" /END
+    inetc::get ${DOWNLOAD_FLAGS} /POPUP "app-32.7z" ${DOWNLOAD_HEADER_FLAGS} ${TRANSLATE_FLAG} "${DOWNLOAD_URL}/${APP_32_FILENAME}" "$PLUGINSDIR\app-32.7z" /END
   !endif
 
   Pop $0
   StrCmp $0 "OK" dlok
-  MessageBox MB_OK|MB_ICONEXCLAMATION "Download error, click OK to abort installation" /SD IDOK
+  MessageBox MB_OK|MB_ICONEXCLAMATION "$(DOWNLOAD_ERROR)" /SD IDOK
   Quit
 dlok:
 # Download was successful

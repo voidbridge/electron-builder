@@ -181,6 +181,10 @@ export default class NsisTarget extends Target {
 
     if (oneClick) {
       defines.ONE_CLICK = null
+
+      if (this.options.spiderBanner !== false) {
+        defines.ONE_CLICK_SPIDER = null
+      }
     }
 
     debug(defines)

@@ -65,6 +65,11 @@ export interface NsisOptions {
   readonly oneClick?: boolean
 
   /*
+  Use SpinderBanner plugin for one-click screens. Defaults to `true`.
+   */
+  readonly spiderBanner?: boolean
+
+  /*
   Defaults to `false`.
 
   If `oneClick` is `true` (default): Install per all users (per-machine).
