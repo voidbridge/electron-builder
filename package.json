@@ -26,7 +26,8 @@
     "update-wiki": "git subtree split -b wiki --prefix docs/ && git push -f wiki wiki:master",
     "whitespace": "whitespace 'src/**/*.ts'",
     "docker-images": "docker/build.sh",
-    "precommit": "validate-commit-msg"
+    "precommit": "validate-commit-msg",
+    "postinstall": "ts-babel . nsis-auto-updater test"
   },
   "repository": "electron-userland/electron-builder",
   "engines": {
