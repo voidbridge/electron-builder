@@ -24,7 +24,7 @@ async function main() {
   ])
 
   // if two package.json — force full install (user wants to install/update app deps in addition to dev)
-  await installOrRebuild(devMetadata.build, results[0], results[1], args.arch, results[0] !== projectDir)
+  await installOrRebuild(devMetadata.build, results[0], results[1], args.arch, process.platform, results[0] !== projectDir)
 }
 
 main()
