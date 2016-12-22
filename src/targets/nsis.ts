@@ -187,6 +187,8 @@ export default class NsisTarget extends Target {
       }
     }
 
+    Object.assign(defines, this.options.defines)
+
     debug(defines)
     debug(commands)
 

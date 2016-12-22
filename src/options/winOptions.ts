@@ -135,6 +135,8 @@ export interface NsisOptions {
   readonly downloadUrl?: string
 
   readonly downloadHost?: string
+
+  readonly defines?: any
 }
 
 /*
