@@ -1,11 +1,11 @@
 import { Platform, Arch } from "out"
-import { assertPack, getTestAsset, app } from "../helpers/packTester"
-import { copy, outputFile, readFile } from "fs-extra-p"
+import { assertPack, app, copyTestAsset } from "../helpers/packTester"
+import { outputFile, readFile } from "fs-extra-p"
 import * as path from "path"
 import BluebirdPromise from "bluebird-lst-c"
 import { assertThat } from "../helpers/fileAssert"
 import { extractFile } from "asar-electron-builder"
-import { walk } from "out/asarUtil"
+import { walk } from "out/util/fs"
 import { nsisPerMachineInstall } from "../helpers/expectedContents"
 import { WineManager, diff } from "../helpers/wine"
 import { safeLoad } from "js-yaml"
@@ -14,16 +14,14 @@ const nsisTarget = Platform.WINDOWS.createTarget(["nsis"])
 
 test("one-click", app({
   targets: Platform.WINDOWS.createTarget(["nsis"], Arch.ia32),
-  devMetadata: {
-    build: {
-      publish: {
-        provider: "bintray",
-        owner: "actperepo",
-        package: "TestApp",
-      },
-      // wine creates incorrect filenames and registry entries for unicode, so, we use ASCII
-      // productName: "TestApp",
-    }
+  config: {
+    publish: {
+      provider: "bintray",
+      owner: "actperepo",
+      package: "TestApp",
+    },
+    // wine creates incorrect filenames and registry entries for unicode, so, we use ASCII
+    // productName: "TestApp",
   }
 }, {
   useTempDir: true,
@@ -31,52 +29,48 @@ test("one-click", app({
   packed: async (context) => {
     await doTest(context.outDir, true)
 
-    assertThat(safeLoad(await readFile(path.join(context.getResources(Platform.WINDOWS, Arch.ia32), "app-update.yml"), "utf-8"))).hasProperties({
-      provider: "bintray",
-      owner: "actperepo",
-      package: "TestApp",
-    })
+    expect(safeLoad(await readFile(path.join(context.getResources(Platform.WINDOWS, Arch.ia32), "app-update.yml"), "utf-8"))).toMatchSnapshot()
   }
 }))
 
 test.ifDevOrLinuxCi("perMachine, no run after finish", app({
   targets: Platform.WINDOWS.createTarget(["nsis"], Arch.ia32),
-  devMetadata: {
-    build: {
-      // wine creates incorrect filenames and registry entries for unicode, so, we use ASCII
-      productName: "TestApp",
-      fileAssociations: [
-        {
-          ext: "foo",
-          name: "Test Foo",
-        }
-      ],
-      nsis: {
-        perMachine: true,
-        runAfterFinish: false,
-      },
-      publish: {
-        provider: "generic",
-        url: "https://develar.s3.amazonaws.com/test",
-      },
-    }
+  config: {
+    // wine creates incorrect filenames and registry entries for unicode, so, we use ASCII
+    productName: "TestApp",
+    fileAssociations: [
+      {
+        ext: "foo",
+        name: "Test Foo",
+      }
+    ],
+    nsis: {
+      perMachine: true,
+      runAfterFinish: false,
+    },
+    publish: {
+      provider: "generic",
+      url: "https://develar.s3.amazonaws.com/test",
+    },
   },
 }, {
   projectDirCreated: projectDir => {
-    let headerIconPath = path.join(projectDir, "build", "foo.ico")
-    return BluebirdPromise.all([copy(getTestAsset("headerIcon.ico"), headerIconPath), copy(getTestAsset("license.txt"), path.join(projectDir, "build", "license.txt"))])
+    return BluebirdPromise.all([
+      copyTestAsset("headerIcon.ico", path.join(projectDir, "build", "foo.ico")),
+      copyTestAsset("license.txt", path.join(projectDir, "build", "license.txt"),
+      )])
   },
   packed: async(context) => {
-    assertThat(safeLoad(await readFile(path.join(context.getResources(Platform.WINDOWS, Arch.ia32), "app-update.yml"), "utf-8"))).hasProperties({
-          provider: "generic",
-          url: "https://develar.s3.amazonaws.com/test",
-        })
+    expect(safeLoad(await readFile(path.join(context.getResources(Platform.WINDOWS, Arch.ia32), "app-update.yml"), "utf-8"))).toMatchObject({
+      provider: "generic",
+      url: "https://develar.s3.amazonaws.com/test",
+    })
     const updateInfo = safeLoad(await readFile(path.join(context.outDir, "latest.yml"), "utf-8"))
-    assertThat(updateInfo).hasProperties({
-          version: "1.1.0",
-          path: "TestApp Setup 1.1.0.exe",
-        })
-    assertThat(updateInfo.sha2).isNotEmpty()
+    expect(updateInfo).toMatchObject({
+      version: "1.1.0",
+      path: "TestApp Setup 1.1.0.exe",
+    })
+    expect(updateInfo.sha2).not.toEqual("")
     await doTest(context.outDir, false)
   },
 }))
@@ -105,7 +99,7 @@ async function doTest(outDir: string, perUser: boolean) {
 
   const instDir = perUser ? path.join(wine.userDir, "Local Settings", "Application Data", "Programs") : path.join(driveC, "Program Files")
   const appAsar = path.join(instDir, "TestApp", "1.1.0", "resources", "app.asar")
-  assertThat(JSON.parse(extractFile(appAsar, "package.json").toString())).hasProperties({
+  expect(JSON.parse(extractFile(appAsar, "package.json").toString())).toMatchObject({
     name: "TestApp"
   })
 
@@ -144,14 +138,14 @@ test.ifNotCiMac("installerHeaderIcon", () => {
     }, {
       projectDirCreated: projectDir => {
         headerIconPath = path.join(projectDir, "build", "installerHeaderIcon.ico")
-        return copy(getTestAsset("headerIcon.ico"), headerIconPath)
+        return copyTestAsset("headerIcon.ico", headerIconPath)
       }
     }
   )
 })
 
 test.ifDevOrLinuxCi("custom include", () => assertPack("test-app-one", {targets: nsisTarget}, {
-  projectDirCreated: projectDir => copy(getTestAsset("installer.nsh"), path.join(projectDir, "build", "installer.nsh")),
+  projectDirCreated: projectDir => copyTestAsset("installer.nsh", path.join(projectDir, "build", "installer.nsh")),
   packed: context => BluebirdPromise.all([
     assertThat(path.join(context.projectDir, "build", "customHeader")).isFile(),
     assertThat(path.join(context.projectDir, "build", "customInit")).isFile(),
@@ -160,6 +154,6 @@ test.ifDevOrLinuxCi("custom include", () => assertPack("test-app-one", {targets:
 }))
 
 test.ifDevOrLinuxCi("custom script", app({targets: nsisTarget}, {
-  projectDirCreated: projectDir => copy(getTestAsset("installer.nsi"), path.join(projectDir, "build", "installer.nsi")),
+  projectDirCreated: projectDir => copyTestAsset("installer.nsi", path.join(projectDir, "build", "installer.nsi")),
   packed: context => assertThat(path.join(context.projectDir, "build", "customInstallerScript")).isFile(),
 }))

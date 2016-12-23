@@ -1,4 +1,4 @@
-import { exec, getTempName, isEmptyOrSpaces, isCi, getCacheDirectory, statOrNull } from "./util/util"
+import { exec, getTempName, isEmptyOrSpaces, getCacheDirectory } from "./util/util"
 import { deleteFile, outputFile, copy, rename } from "fs-extra-p"
 import { download } from "./util/httpRequest"
 import * as path from "path"
@@ -7,6 +7,8 @@ import BluebirdPromise from "bluebird-lst-c"
 import { randomBytes } from "crypto"
 import { TmpDir } from "./util/tmp"
 import { homedir } from "os"
+import { statOrNull } from "./util/fs"
+import isCi from "is-ci"
 
 export const appleCertificatePrefixes = ["Developer ID Application:", "Developer ID Installer:", "3rd Party Mac Developer Application:", "3rd Party Mac Developer Installer:"]
 
@@ -68,7 +70,7 @@ async function createCustomCertKeychain() {
   const list = results[0]
     .split("\n")
     .map(it => {
-      let r = it.trim()
+      const r = it.trim()
       return r.substring(1, r.length - 1)
     })
     .filter(it => it.length > 0)
@@ -140,7 +142,7 @@ async function getValidIdentities(keychain?: string | null): Promise<Array<strin
     result = BluebirdPromise.all<Array<string>>([
       exec("security", addKeychain(["find-identity", "-v"]))
         .then(it => it.trim().split("\n").filter(it => {
-          for (let prefix of appleCertificatePrefixes) {
+          for (const prefix of appleCertificatePrefixes) {
             if (it.includes(prefix)) {
               return true
             }
@@ -170,7 +172,7 @@ async function _findIdentity(type: CertType, qualifier?: string | null, keychain
   //noinspection SpellCheckingInspection
   const lines = await getValidIdentities(keychain)
   const namePrefix = `${type}:`
-  for (let line of lines) {
+  for (const line of lines) {
     if (qualifier != null && !line.includes(qualifier)) {
       continue
     }
@@ -183,7 +185,7 @@ async function _findIdentity(type: CertType, qualifier?: string | null, keychain
   if (type === "Developer ID Application") {
     // find non-Apple certificate
     // https://github.com/electron-userland/electron-builder/issues/458
-    l: for (let line of lines) {
+    l: for (const line of lines) {
       if (qualifier != null && !line.includes(qualifier)) {
         continue
       }
@@ -192,7 +194,7 @@ async function _findIdentity(type: CertType, qualifier?: string | null, keychain
         continue
       }
 
-      for (let prefix of appleCertificatePrefixes) {
+      for (const prefix of appleCertificatePrefixes) {
         if (line.includes(prefix)) {
           continue l
         }
@@ -207,7 +209,7 @@ async function _findIdentity(type: CertType, qualifier?: string | null, keychain
 export async function findIdentity(certType: CertType, qualifier?: string | null, keychain?: string | null): Promise<string | null> {
   let identity = process.env.CSC_NAME || qualifier
   if (isEmptyOrSpaces(identity)) {
-    if (keychain == null && !isCi() && (process.env.CSC_IDENTITY_AUTO_DISCOVERY === "false")) {
+    if (keychain == null && !isCi && process.env.CSC_IDENTITY_AUTO_DISCOVERY === "false") {
       return null
     }
     else {
@@ -216,7 +218,7 @@ export async function findIdentity(certType: CertType, qualifier?: string | null
   }
   else {
     identity = identity.trim()
-    for (let prefix of appleCertificatePrefixes) {
+    for (const prefix of appleCertificatePrefixes) {
       checkPrefix(identity, prefix)
     }
     const result = await _findIdentity(certType, identity, keychain)

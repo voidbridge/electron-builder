@@ -1,6 +1,5 @@
 import { Provider, FileInfo } from "./api"
-import { BintrayClient } from "../../src/publish/bintray"
-import { HttpError } from "../../src/publish/restApiRequest"
+import { BintrayClient, HttpError } from "../../src/publish/bintray"
 import { BintrayOptions, VersionInfo } from "../../src/options/publishOptions"
 
 export class BintrayProvider implements Provider<VersionInfo> {
@@ -18,7 +17,7 @@ export class BintrayProvider implements Provider<VersionInfo> {
       }
     }
     catch (e) {
-      if (e instanceof HttpError && e.response.statusCode === 404) {
+      if ("response" in e && e.response.statusCode === 404) {
         throw new Error(`No latest version, please ensure that user, package and repository correctly configured. Or at least one version is published. ${e.stack || e.message}`)
       }
       throw e
@@ -29,7 +28,7 @@ export class BintrayProvider implements Provider<VersionInfo> {
     try {
       const files = await this.client.getVersionFiles(versionInfo.version)
       const suffix = `${versionInfo.version}.exe`
-      for (let file of files) {
+      for (const file of files) {
         if (file.name.endsWith(suffix) && file.name.includes("Setup")) {
           return {
             name: file.name,

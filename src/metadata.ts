@@ -58,17 +58,6 @@ export interface DevMetadata extends Metadata {
    See [.build](#BuildMetadata).
    */
   readonly build: BuildMetadata
-
-  // deprecated
-  readonly homepage?: string | null
-
-  // deprecated
-  readonly license?: string | null
-
-  /*
-   See [.directories](#MetadataDirectories)
-   */
-  readonly directories?: MetadataDirectories | null
 }
 
 export interface RepositoryInfo {
@@ -115,26 +104,24 @@ export interface BuildMetadata {
    */
   readonly files?: Array<string> | string | null
 
-  /**
+  /*
    A [glob patterns](https://www.npmjs.com/package/glob#glob-primer) relative to the project directory, when specified, copy the file or directory with matching names directly into the app's resources directory (`Contents/Resources` for MacOS, `resources` for Linux/Windows).
 
    Glob rules the same as for [files](#multiple-glob-patterns).
    */
   readonly extraResources?: Array<string> | string | null
 
-  /**
+  /*
    The same as [extraResources](#BuildMetadata-extraResources) but copy into the app's content directory (`Contents` for MacOS, root directory for Linux/Windows).
    */
   readonly extraFiles?: Array<string> | string | null
 
   /*
-   Whether to package the application's source code into an archive, using [Electron's archive format](http://electron.atom.io/docs/tutorial/application-packaging/). Defaults to `true`.
-   Reasons why you may want to disable this feature are described in [an application packaging tutorial in Electron's documentation](http://electron.atom.io/docs/tutorial/application-packaging/#limitations-of-the-node-api).
+  Whether to package the application's source code into an archive, using [Electron's archive format](http://electron.atom.io/docs/tutorial/application-packaging/). Defaults to `true`.
+  Node modules, that must be unpacked, will be detected automatically, you don't need to explicitly set [asarUnpack](#BuildMetadata-asarUnpack) - please file issue if this doesn't work.
 
-   Or you can pass object of any asar options.
-
-   Node modules, that must be unpacked, will be detected automatically, you don't need to explicitly set `asarUnpack` - please file issue if this doesn't work.
-   */
+  Or you can pass object of asar options.
+  */
   readonly asar?: AsarOptions | boolean | null
 
   /**
@@ -239,12 +226,20 @@ export interface BuildMetadata {
   // deprecated
   readonly "app-bundle-id"?: string | null
 
-  readonly dereference?: boolean
-
   /*
   See [.build.publish](#PublishConfiguration).
    */
   readonly publish?: Publish
+
+  /*
+  Whether to fail if application will be not signed (to prevent unsigned app if code signing configuration is not correct).
+   */
+  readonly forceCodeSigning?: boolean
+
+  /*
+   See [.directories](#MetadataDirectories)
+   */
+  readonly directories?: MetadataDirectories | null
 }
 
 export interface AfterPackContext {
@@ -283,9 +278,14 @@ export interface FileAssociation {
   readonly icon?: string
 
   /*
-  *macOS-only* The app’s role with respect to the type. The value can be `Editor`, `Viewer`, `Shell`, or `None`. Defaults to `Editor`.
+  *macOS-only* The app’s role with respect to the type. The value can be `Editor`, `Viewer`, `Shell`, or `None`. Defaults to `Editor`. Corresponds to `CFBundleTypeRole`.
    */
   readonly role?: string
+
+  /*
+  *macOS-only* Whether the document is distributed as a bundle. If set to true, the bundle directory is treated as a file. Corresponds to `LSTypeIsPackage`.
+   */
+  readonly isPackage?: boolean
 }
 
 /*
@@ -348,6 +348,8 @@ export interface PlatformSpecificBuildOptions {
   readonly fileAssociations?: Array<FileAssociation> | FileAssociation
 
   readonly publish?: Publish
+
+  readonly forceCodeSigning?: boolean
 }
 
 export class Platform {
@@ -372,7 +374,7 @@ export class Platform {
       archs = [Arch.x64]
     }
 
-    for (let arch of (archs == null || archs.length === 0 ? [archFromString(process.arch)] : archs)) {
+    for (const arch of (archs == null || archs.length === 0 ? [archFromString(process.arch)] : archs)) {
       archToType.set(arch, type == null ? [] : (Array.isArray(type) ? type : [type]))
     }
     return new Map([[this, archToType]])

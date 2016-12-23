@@ -16,7 +16,7 @@ export interface WinBuildOptions extends PlatformSpecificBuildOptions {
   /*
    Array of signing algorithms used. Defaults to `['sha1', 'sha256']`
 
-   Fo AppX `sha256` is always used.
+   For AppX `sha256` is always used.
    */
   readonly signingHashAlgorithms?: Array<string> | null
 
@@ -51,6 +51,11 @@ export interface WinBuildOptions extends PlatformSpecificBuildOptions {
   The URL of the RFC 3161 time stamp server. Defaults to `http://timestamp.comodoca.com/rfc3161`.
    */
   readonly rfc3161TimeStampServer?: string
+
+  /*
+  The URL of the time stamp server. Defaults to `http://timestamp.verisign.com/scripts/timstamp.dll`.
+   */
+  readonly timeStampServer?: string
 }
 
 /*
@@ -87,6 +92,11 @@ export interface NsisOptions {
   See [GUID vs Application Name](https://github.com/electron-userland/electron-builder/wiki/NSIS#guid-vs-application-name).
    */
   readonly guid?: string | null
+
+  /*
+   The path to installer icon. Defaults to `build/installerIcon.ico` or application icon.
+   */
+  readonly installerIcon?: string | null
 
   /*
    *boring installer only.* `MUI_HEADERIMAGE`, relative to the project directory. Defaults to `build/installerHeader.bmp`
@@ -169,10 +179,36 @@ export interface SquirrelWindowsOptions extends WinBuildOptions {
   readonly useAppIdAsId?: boolean
 }
 
+/*
+ ### `.build.appx`
+
+ Please see [Windows AppX docs](https://msdn.microsoft.com/en-us/library/windows/apps/br211453.aspx).
+ */
 export interface AppXOptions {
-  // readonly flatten?: boolean
+  /*
+   The background color of the app tile. Please see [Visual Elements](https://msdn.microsoft.com/en-us/library/windows/apps/br211471.aspx).
+   */
   readonly backgroundColor?: string | null
+
   readonly makeappxArgs?: Array<string> | null
 
+  /*
+   Describes the publisher information. The Publisher attribute must match the publisher subject information of the certificate used to sign a package. For now, required.
+   */
   readonly publisher?: string | null
+
+  /*
+   A friendly name that can be displayed to users. Corresponds to [Properties.DisplayName](https://msdn.microsoft.com/en-us/library/windows/apps/br211432.aspx).
+   */
+  readonly displayName?: string | null
+
+  /*
+   A friendly name for the publisher that can be displayed to users. Corresponds to [Properties.PublisherDisplayName](https://msdn.microsoft.com/en-us/library/windows/apps/br211460.aspx).
+   */
+  readonly publisherDisplayName?: string | null
+
+  /*
+   Describes the contents of the package. The Name attribute is case-sensitive. Corresponds to [Identity.Name](https://msdn.microsoft.com/en-us/library/windows/apps/br211441.aspx).
+   */
+  readonly identityName?: string | null
 }

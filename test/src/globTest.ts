@@ -8,12 +8,8 @@ import { statFile } from "asar-electron-builder"
 
 test.ifDevOrLinuxCi("unpackDir one", app({
   targets: Platform.LINUX.createTarget(DIR_TARGET),
-  devMetadata: {
-    build: {
-      asar: {
-        unpackDir: "{assets,b2}"
-      },
-    }
+  config: {
+    asarUnpack: ["assets", "b2"],
   }
 }, {
   projectDirCreated: projectDir => {
@@ -33,12 +29,8 @@ test.ifDevOrLinuxCi("unpackDir one", app({
 test.ifDevOrLinuxCi("unpackDir", () => {
   return assertPack("test-app", {
     targets: Platform.LINUX.createTarget(DIR_TARGET),
-    devMetadata: {
-      build: {
-        asar: {
-          unpackDir: "{assets,b2}"
-        },
-      }
+    config: {
+      asarUnpack: ["assets", "b2"],
     }
   }, {
     projectDirCreated: projectDir => {
@@ -63,9 +55,7 @@ test.ifNotWindows("link", app({
     return symlink(path.join(projectDir, "index.js"), path.join(projectDir, "foo.js"))
   },
   packed: async context => {
-    assertThat(statFile(path.join(context.getResources(Platform.LINUX), "app.asar"), "foo.js", false)).hasProperties({
-      link: "index.js",
-    })
+    expect(statFile(path.join(context.getResources(Platform.LINUX), "app.asar"), "foo.js", false)).toMatchSnapshot()
   },
 }))
 

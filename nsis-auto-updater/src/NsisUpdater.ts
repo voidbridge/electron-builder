@@ -4,16 +4,23 @@ import * as path from "path"
 import { tmpdir } from "os"
 import { gt as isVersionGreaterThan, valid as parseVersion } from "semver"
 import { download } from "../../src/util/httpRequest"
-import { Provider, UpdateCheckResult } from "./api"
+import { Provider, UpdateCheckResult, FileInfo } from "./api"
 import { BintrayProvider } from "./BintrayProvider"
 import BluebirdPromise from "bluebird-lst-c"
-import { BintrayOptions, PublishConfiguration, GithubOptions, GenericServerOptions } from "../../src/options/publishOptions"
-import { readFile } from "fs-extra-p"
+import { BintrayOptions, PublishConfiguration, GithubOptions, GenericServerOptions, VersionInfo } from "../../src/options/publishOptions"
+import { readFile, mkdtemp } from "fs-extra-p"
 import { safeLoad } from "js-yaml"
 import { GenericProvider } from "./GenericProvider"
 import { GitHubProvider } from "./GitHubProvider"
+import { executorHolder } from "../../src/util/httpExecutor"
+import { ElectronHttpExecutor } from "./electronHttpExecutor"
 
 export class NsisUpdater extends EventEmitter {
+  /**
+   * Automatically download an update when it is found.
+   */
+  public autoDownload = true
+
   private setupPath: string | null
 
   private updateAvailable = false
@@ -21,41 +28,57 @@ export class NsisUpdater extends EventEmitter {
 
   private clientPromise: Promise<Provider<any>>
 
+  private readonly untilAppReady: Promise<boolean>
+
   private readonly app: any
 
   private quitHandlerAdded = false
 
+  private versionInfo: VersionInfo | null
+  private fileInfo: FileInfo | null
+
   constructor(options?: PublishConfiguration | BintrayOptions | GithubOptions) {
     super()
 
-    this.app = (<any>global).__test_app || require("electron").app
-
-    if (options == null) {
-      this.clientPromise = this.loadUpdateConfig()
+    if ((<any>global).__test_app) {
+      this.app = (<any>global).__test_app
+      this.untilAppReady = BluebirdPromise.resolve()
     }
     else {
+      this.app = require("electron").app
+      executorHolder.httpExecutor = new ElectronHttpExecutor()
+      this.untilAppReady = new BluebirdPromise(resolve => {
+        if (this.app.isReady()) {
+          resolve()
+        }
+        else {
+          this.app.on("ready", resolve)
+        }
+      })
+    }
+
+
+    if (options != null) {
       this.setFeedURL(options)
     }
   }
 
+  //noinspection JSMethodCanBeStatic,JSUnusedGlobalSymbols
   getFeedURL(): string | null | undefined {
-    return JSON.stringify(this.clientPromise, null, 2)
+    return "Deprecated. Do not use it."
   }
 
-  setFeedURL(value: string | PublishConfiguration | BintrayOptions | GithubOptions | GenericServerOptions) {
+  setFeedURL(value: PublishConfiguration | BintrayOptions | GithubOptions | GenericServerOptions) {
     this.clientPromise = BluebirdPromise.resolve(createClient(value))
   }
 
   async checkForUpdates(): Promise<UpdateCheckResult> {
-    if (this.clientPromise == null) {
-      const message = "Update URL is not set"
-      const error = new Error(message)
-      this.emit("error", error, message)
-      throw error
-    }
-
+    await this.untilAppReady
     this.emit("checking-for-update")
     try {
+      if (this.clientPromise == null) {
+        this.clientPromise = NsisUpdater.loadUpdateConfig()
+      }
       return await this.doCheckForUpdates()
     }
     catch (e) {
@@ -89,27 +112,48 @@ export class NsisUpdater extends EventEmitter {
     const fileInfo = await client.getUpdateFile(versionInfo)
 
     this.updateAvailable = true
+    this.versionInfo = versionInfo
+    this.fileInfo = fileInfo
+
     this.emit("update-available")
 
-    const mkdtemp: (prefix: string) => Promise<string> = require("fs-extra-p").mkdtemp
+    //noinspection ES6MissingAwait
     return {
       versionInfo: versionInfo,
       fileInfo: fileInfo,
-      downloadPromise: mkdtemp(`${path.join(tmpdir(), "up")}-`)
-        .then(it => download(fileInfo.url, path.join(it, fileInfo.name), fileInfo.sha2 == null ? null : {sha2: fileInfo.sha2}))
-        .then(it => {
-          this.setupPath = it
-          this.addQuitHandler()
-          this.emit("update-downloaded", {}, null, versionInfo.version, null, null, () => {
-            this.quitAndInstall()
-          })
-          return it
-        })
-        .catch(e => {
-          this.emit("error", e, (e.stack || e).toString())
-          throw e
-        }),
+      downloadPromise: this.autoDownload ? this.downloadUpdate() : null,
     }
+  }
+
+  /**
+   * Start downloading update manually. You can use this method if `autoDownload` option is set to `false`.
+   * @returns {Promise<string>} Path to downloaded file.
+   */
+  async downloadUpdate() {
+    const versionInfo = this.versionInfo
+    const fileInfo = this.fileInfo
+
+    if (versionInfo == null || fileInfo == null) {
+      const message = "Please check update first"
+      const error = new Error(message)
+      this.emit("error", error, message)
+      throw error
+    }
+
+    return mkdtemp(`${path.join(tmpdir(), "up")}-`)
+      .then(it => download(fileInfo.url, path.join(it, fileInfo.name), fileInfo.sha2 == null ? null : {sha2: fileInfo.sha2}))
+      .then(it => {
+        this.setupPath = it
+        this.addQuitHandler()
+        this.emit("update-downloaded", {}, null, versionInfo.version, null, null, () => {
+          this.quitAndInstall()
+        })
+        return it
+      })
+      .catch(e => {
+        this.emit("error", e, (e.stack || e).toString())
+        throw e
+      })
   }
 
   private addQuitHandler() {
@@ -145,7 +189,11 @@ export class NsisUpdater extends EventEmitter {
     // prevent calling several times
     this.quitAndInstallCalled = true
 
-    spawn(setupPath, isSilent ? ["/S"] : [], {
+    const args = ["--updated"]
+    if (isSilent) {
+      args.push("/S")
+    }
+    spawn(setupPath, args, {
       detached: true,
       stdio: "ignore",
     }).unref()
@@ -153,14 +201,8 @@ export class NsisUpdater extends EventEmitter {
     return true
   }
 
-  async loadUpdateConfig() {
-    try {
-      return createClient(safeLoad(await readFile(path.join((<any>global).__test_resourcesPath || (<any>process).resourcesPath, "app-update.yml"), "utf-8")))
-    }
-    catch (e) {
-      this.emit("error", e, (e.stack || e).toString())
-      throw e
-    }
+  private static async loadUpdateConfig() {
+    return createClient(safeLoad(await readFile(path.join((<any>global).__test_resourcesPath || (<any>process).resourcesPath, "app-update.yml"), "utf-8")))
   }
 }
 
@@ -168,13 +210,16 @@ function createClient(data: string | PublishConfiguration | BintrayOptions | Git
   if (typeof data === "string") {
     throw new Error("Please pass PublishConfiguration object")
   }
-  else {
-    const provider = (<PublishConfiguration>data).provider
-    switch (provider) {
-      case "github": return new GitHubProvider(<GithubOptions>data)
-      case "generic": return new GenericProvider(<GenericServerOptions>data)
-      case "bintray":  return new BintrayProvider(<BintrayOptions>data)
-      default: throw new Error(`Unsupported provider: ${provider}`)
-    }
+
+  const provider = (<PublishConfiguration>data).provider
+  switch (provider) {
+    case "github":
+      return new GitHubProvider(<GithubOptions>data)
+    case "generic":
+      return new GenericProvider(<GenericServerOptions>data)
+    case "bintray":
+      return new BintrayProvider(<BintrayOptions>data)
+    default:
+      throw new Error(`Unsupported provider: ${provider}`)
   }
 }

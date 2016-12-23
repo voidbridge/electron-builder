@@ -104,7 +104,7 @@ export class WinPackager extends PlatformPackager<WinBuildOptions> {
   }
 
   private async getValidIconPath(): Promise<string | null> {
-    let iconPath = this.platformSpecificBuildOptions.icon || this.devMetadata.build.icon
+    let iconPath = this.platformSpecificBuildOptions.icon || this.config.icon
     if (iconPath != null && !iconPath.endsWith(".ico")) {
       iconPath += ".ico"
     }
@@ -121,6 +121,11 @@ export class WinPackager extends PlatformPackager<WinBuildOptions> {
   async sign(file: string) {
     const cscInfo = await this.cscInfo
     if (cscInfo == null) {
+      const forceCodeSigningPlatform = this.platformSpecificBuildOptions.forceCodeSigning
+      if (forceCodeSigningPlatform == null ? this.config.forceCodeSigning : forceCodeSigningPlatform) {
+        throw new Error(`App is not signed and "forceCodeSigning" is set to true, please ensure that code signing configuration is correct, please see https://github.com/electron-userland/electron-builder/wiki/Code-Signing`)
+      }
+
       return
     }
 
@@ -134,8 +139,7 @@ export class WinPackager extends PlatformPackager<WinBuildOptions> {
       password: cscInfo.password,
       name: this.appInfo.productName,
       site: await this.appInfo.computePackageUrl(),
-      hash: this.platformSpecificBuildOptions.signingHashAlgorithms,
-      tr: this.platformSpecificBuildOptions.rfc3161TimeStampServer,
+      options: this.platformSpecificBuildOptions,
     })
   }
 
@@ -150,7 +154,7 @@ export class WinPackager extends PlatformPackager<WinBuildOptions> {
     const args = [
       file,
       "--set-version-string", "CompanyName", appInfo.companyName,
-      "--set-version-string", "FileDescription", appInfo.description,
+      "--set-version-string", "FileDescription", appInfo.productName,
       "--set-version-string", "ProductName", appInfo.productName,
       "--set-version-string", "InternalName", path.basename(appInfo.productFilename, ".exe"),
       "--set-version-string", "LegalCopyright", appInfo.copyright,
@@ -194,7 +198,7 @@ async function checkIcon(file: string): Promise<void> {
   }
 
   const sizes = parseIco(buffer)
-  for (let size of sizes) {
+  for (const size of sizes) {
     if (size!.w >= 256 && size!.h >= 256) {
       return
     }

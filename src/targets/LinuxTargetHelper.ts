@@ -23,14 +23,16 @@ export class LinuxTargetHelper {
       return await this.iconsFromDir(path.join(this.packager.buildResourcesDir, "icons"))
     }
     else {
-      return await this.createFromIcns(await this.packager.getTempFile("electron-builder-linux.iconset").then(it => ensureDir(it).thenReturn(it)))
+      const iconDir = await this.packager.getTempFile("linux.iconset")
+      ensureDir(iconDir)
+      return await this.createFromIcns(iconDir)
     }
   }
 
   private async iconsFromDir(iconsDir: string) {
     const mappings: Array<Array<string>> = []
     let maxSize = 0
-    for (let file of (await readdir(iconsDir))) {
+    for (const file of (await readdir(iconsDir))) {
       if (file.endsWith(".png") || file.endsWith(".PNG")) {
         // If parseInt encounters a character that is not a numeral in the specified radix,
         // it returns the integer value parsed up to that point
@@ -55,7 +57,7 @@ export class LinuxTargetHelper {
   }
 
   private async getIcns(): Promise<string | null> {
-    const build = this.packager.devMetadata.build
+    const build = this.packager.config
     let iconPath = (build.mac || {}).icon || build.icon
     if (iconPath != null && !iconPath.endsWith(".icns")) {
       iconPath += ".icns"
@@ -88,7 +90,7 @@ export class LinuxTargetHelper {
     }
 
     let data = `[Desktop Entry]`
-    for (let name of Object.keys(desktopMeta)) {
+    for (const name of Object.keys(desktopMeta)) {
       const value = desktopMeta[name]
       data += `\n${name}=${value}`
     }

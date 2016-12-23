@@ -1,20 +1,17 @@
 import { Platform, Arch } from "out"
-import { app, modifyPackageJson, appThrows, getTestAsset, assertPack, CheckingWinPackager } from "../helpers/packTester"
+import { app, modifyPackageJson, appThrows, assertPack, CheckingWinPackager, copyTestAsset } from "../helpers/packTester"
 import * as path from "path"
 import BluebirdPromise from "bluebird-lst-c"
-import { copy } from "fs-extra-p"
 
 test.ifNotCiMac("Squirrel.Windows", app({targets: Platform.WINDOWS.createTarget(["squirrel", "zip"])}, {signed: true}))
 
 // very slow
 test.skip("delta and msi", app({
   targets: Platform.WINDOWS.createTarget("squirrel", Arch.ia32),
-  devMetadata: {
-    build: {
-      squirrelWindows: {
-        remoteReleases: "https://github.com/develar/__test-app-releases",
-        msi: true,
-      },
+  config: {
+    squirrelWindows: {
+      remoteReleases: "https://github.com/develar/__test-app-releases",
+      msi: true,
     }
   },
 }))
@@ -34,18 +31,16 @@ test("detect install-spinner, certificateFile/password", () => {
   return assertPack("test-app-one", {
     targets: Platform.WINDOWS.createTarget("squirrel"),
     platformPackagerFactory: (packager, platform, cleanupTasks) => platformPackager = new CheckingWinPackager(packager),
-    devMetadata: {
-      build: {
-        win: {
-          certificatePassword: "pass",
-        }
+    config: {
+      win: {
+        certificatePassword: "pass",
       }
     }
   }, {
     projectDirCreated: it => {
       loadingGifPath = path.join(it, "build", "install-spinner.gif")
       return BluebirdPromise.all([
-        copy(getTestAsset("install-spinner.gif"), loadingGifPath),
+        copyTestAsset("install-spinner.gif", loadingGifPath),
         modifyPackageJson(it, data => {
           data.build.win = {
             certificateFile: "secretFile",

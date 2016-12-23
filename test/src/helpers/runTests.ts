@@ -3,6 +3,7 @@ import BluebirdPromise from "bluebird-lst-c"
 import { emptyDir, readdir, unlink, removeSync, readJson } from "fs-extra-p"
 import { homedir } from "os"
 import { TEST_DIR, ELECTRON_VERSION } from "./config"
+import isCi from "is-ci"
 
 // we set NODE_PATH in this file, so, we cannot use 'out/awaiter' path here
 const util = require("../../../out/util/util")
@@ -33,14 +34,14 @@ main()
   })
 
 async function deleteOldElectronVersion(): Promise<any> {
-  if (!process.env.CI) {
+  if (!isCi) {
     return
   }
 
   const cacheDir = path.join(homedir(), ".electron")
   try {
     const deletePromises: Array<Promise<any>> = []
-    for (let file of (await readdir(cacheDir))) {
+    for (const file of (await readdir(cacheDir))) {
       if (file.endsWith(".zip") && !file.includes(ELECTRON_VERSION)) {
         console.log(`Remove old electron ${file}`)
         deletePromises.push(unlink(path.join(cacheDir, file)))
@@ -65,9 +66,9 @@ function downloadAllRequiredElectronVersions(): Promise<any> {
   }
 
   const versions: Array<any> = []
-  for (let platform of platforms) {
+  for (const platform of platforms) {
     const archs = (platform === "mas" || platform === "darwin") ? ["x64"] : (platform === "win32" ? ["ia32", "x64"] : ["ia32", "x64", "armv7l"])
-    for (let arch of archs) {
+    for (const arch of archs) {
       versions.push({
         version: ELECTRON_VERSION,
         arch: arch,
@@ -78,9 +79,6 @@ function downloadAllRequiredElectronVersions(): Promise<any> {
   return BluebirdPromise.map(versions, it => downloadElectron(it), {concurrency: 3})
 }
 
-/**
- * CIRCLE_NODE_INDEX=2 — test nodejs 4 (on Circle).
- */
 async function runTests() {
   const testFiles: string | null = process.env.TEST_FILES
 
@@ -98,6 +96,9 @@ async function runTests() {
     if (circleNodeIndex === 0 || circleNodeIndex === 2) {
       skipWin = true
       args.push("linux.*", "BuildTest.js", "extraMetadataTest.js", "mainEntryTest.js", "globTest.js", "filesTest.js", "ignoreTest.js")
+      if (circleNodeIndex === 0) {
+        args.push("nsisUpdaterTest")
+      }
     }
     else {
       args.push("windows.*", "mac.*")
@@ -107,7 +108,6 @@ async function runTests() {
   }
 
   process.env.SKIP_WIN = skipWin
-  process.env.CSC_IDENTITY_AUTO_DISCOVERY = "false"
   process.env.TEST_DIR = TEST_DIR
 
   const rootDir = path.join(__dirname, "..", "..", "..")

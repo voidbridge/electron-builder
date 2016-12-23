@@ -1,10 +1,11 @@
-import { rename, readFile, writeFile, copy, unlink, utimes } from "fs-extra-p"
+import { rename, readFile, writeFile, unlink, utimes, copy } from "fs-extra-p"
 import * as path from "path"
 import { parse as parsePlist, build as buildPlist } from "plist"
 import BluebirdPromise from "bluebird-lst-c"
 import { use, asArray } from "../util/util"
 import { normalizeExt, PlatformPackager } from "../platformPackager"
 import { warn } from "../util/log"
+import { unlinkIfExists, copyFile } from "../util/fs"
 
 function doRename (basePath: string, oldName: string, newName: string) {
   return rename(path.join(basePath, oldName), path.join(basePath, newName))
@@ -36,7 +37,7 @@ export async function createApp(packager: PlatformPackager<any>, appOutDir: stri
   const helperEHPlistFilename = path.join(frameworksPath, "Electron Helper EH.app", "Contents", "Info.plist")
   const helperNPPlistFilename = path.join(frameworksPath, "Electron Helper NP.app", "Contents", "Info.plist")
 
-  const buildMetadata = packager.devMetadata.build!
+  const buildMetadata = packager.config!
   const fileContents: Array<string> = await BluebirdPromise.map([appPlistFilename, helperPlistFilename, helperEHPlistFilename, helperNPPlistFilename, (<any>buildMetadata)["extend-info"]], it => it == null ? it : readFile(it, "utf8"))
   const appPlist = parsePlist(fileContents[0])
   const helperPlist = parsePlist(fileContents[1])
@@ -97,35 +98,49 @@ export async function createApp(packager: PlatformPackager<any>, appOutDir: stri
     })
   }
 
+  const resourcesPath = path.join(contentsPath, "Resources")
+
   const fileAssociations = packager.getFileAssociations()
   if (fileAssociations.length > 0) {
     appPlist.CFBundleDocumentTypes = await BluebirdPromise.map(fileAssociations, async fileAssociation => {
       const extensions = asArray(fileAssociation.ext).map(normalizeExt)
       const customIcon = await packager.getResource(fileAssociation.icon, `${extensions[0]}.icns`)
-      // todo rename electron.icns
-      return <any>{
+      let iconFile = appPlist.CFBundleIconFile
+      if (customIcon != null) {
+        iconFile = path.basename(customIcon)
+        await copyFile(customIcon, path.join(resourcesPath, iconFile))
+      }
+
+      const result = <any>{
         CFBundleTypeExtensions: extensions,
         CFBundleTypeName: fileAssociation.name,
         CFBundleTypeRole: fileAssociation.role || "Editor",
-        CFBundleTypeIconFile: customIcon || appPlist.CFBundleIconFile
+        CFBundleTypeIconFile: iconFile
       }
+
+      if (fileAssociation.isPackage) {
+        result.LSTypeIsPackage = true
+      }
+      return result
     })
   }
 
   use(packager.platformSpecificBuildOptions.category || (<any>buildMetadata).category, it => appPlist.LSApplicationCategoryType = it)
   appPlist.NSHumanReadableCopyright = appInfo.copyright
 
-  const promises: Array<BluebirdPromise<any | n>> = [
+  const promises: Array<Promise<any | n>> = [
     writeFile(appPlistFilename, buildPlist(appPlist)),
     writeFile(helperPlistFilename, buildPlist(helperPlist)),
     writeFile(helperEHPlistFilename, buildPlist(helperEHPlist)),
     writeFile(helperNPPlistFilename, buildPlist(helperNPPlist)),
-    doRename(path.join(contentsPath, "MacOS"), "Electron", appPlist.CFBundleExecutable)
+    doRename(path.join(contentsPath, "MacOS"), "Electron", appPlist.CFBundleExecutable),
+    unlinkIfExists(path.join(appOutDir, "LICENSE")),
+    unlinkIfExists(path.join(appOutDir, "LICENSES.chromium.html")),
   ]
 
   if (icon != null) {
-    promises.push(unlink(path.join(contentsPath, "Resources", oldIcon)))
-    promises.push(copy(icon, path.join(contentsPath, "Resources", appPlist.CFBundleIconFile)))
+    promises.push(unlink(path.join(resourcesPath, oldIcon)))
+    promises.push(copy(icon, path.join(resourcesPath, appPlist.CFBundleIconFile)))
   }
 
   await BluebirdPromise.all(promises)

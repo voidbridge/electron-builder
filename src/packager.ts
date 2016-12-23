@@ -1,9 +1,9 @@
 import * as path from "path"
-import { computeDefaultAppDirectory, getElectronVersion, use, exec, isEmptyOrSpaces } from "./util/util"
+import { computeDefaultAppDirectory, getElectronVersion, use, exec, isEmptyOrSpaces, getDirectoriesConfig } from "./util/util"
 import { all, executeFinally } from "./util/promise"
 import { EventEmitter } from "events"
 import BluebirdPromise from "bluebird-lst-c"
-import { AppMetadata, DevMetadata, Platform, Arch } from "./metadata"
+import { AppMetadata, DevMetadata, Platform, Arch, BuildMetadata } from "./metadata"
 import { PlatformPackager, BuildInfo, ArtifactCreated } from "./platformPackager"
 import { WinPackager } from "./winPackager"
 import * as errorMessages from "./errorMessages"
@@ -28,7 +28,12 @@ export class Packager implements BuildInfo {
   appDir: string
 
   metadata: AppMetadata
+
   devMetadata: DevMetadata
+
+  get config(): BuildMetadata {
+    return this.devMetadata.build
+  }
 
   isTwoPackageJsonProjectLayoutUsed = true
 
@@ -55,12 +60,21 @@ export class Packager implements BuildInfo {
   }
 
   async build(): Promise<Map<Platform, Map<String, Target>>> {
-    const devPackageFile = this.devPackageFile
-
     const extraMetadata = this.options.extraMetadata
     const extraBuildMetadata = extraMetadata == null ? null : extraMetadata.build
 
-    this.devMetadata = deepAssign(await readPackageJson(devPackageFile), this.options.devMetadata)
+    let devMetadataFromOptions = this.options.devMetadata
+    const buildConfigFromOptions = this.options.config
+    if (buildConfigFromOptions != null) {
+      if (devMetadataFromOptions != null) {
+        throw new Error("devMetadata and config cannot be used in conjunction")
+      }
+      devMetadataFromOptions = {build: buildConfigFromOptions}
+    }
+
+    const devPackageFile = this.devPackageFile
+    this.devMetadata = deepAssign(await readPackageJson(devPackageFile), devMetadataFromOptions)
+
     if (extraMetadata != null) {
       if (extraBuildMetadata != null) {
         deepAssign(this.devMetadata, {build: extraBuildMetadata})
@@ -72,7 +86,7 @@ export class Packager implements BuildInfo {
       }
     }
 
-    this.appDir = await computeDefaultAppDirectory(this.projectDir, use(this.devMetadata.directories, it => it!.app))
+    this.appDir = await computeDefaultAppDirectory(this.projectDir, use(getDirectoriesConfig(this.devMetadata), it => it!.app))
 
     this.isTwoPackageJsonProjectLayoutUsed = this.appDir !== this.projectDir
 
@@ -91,7 +105,7 @@ export class Packager implements BuildInfo {
     }
 
     this.checkMetadata(appPackageFile, devPackageFile)
-    checkConflictingOptions(this.devMetadata.build)
+    checkConflictingOptions(this.config)
 
     this.electronVersion = await getElectronVersion(this.devMetadata, devPackageFile)
 
@@ -102,12 +116,12 @@ export class Packager implements BuildInfo {
 
   private async doBuild(cleanupTasks: Array<() => Promise<any>>): Promise<Map<Platform, Map<String, Target>>> {
     const distTasks: Array<Promise<any>> = []
-    const outDir = path.resolve(this.projectDir, use(this.devMetadata.directories, it => it!.output) || "dist")
+    const outDir = path.resolve(this.projectDir, use(getDirectoriesConfig(this.devMetadata), it => it!.output) || "dist")
 
     const platformToTarget: Map<Platform, Map<String, Target>> = new Map()
     // custom packager - don't check wine
     let checkWine = this.options.platformPackagerFactory == null
-    for (let [platform, archToType] of this.options.targets!) {
+    for (const [platform, archToType] of this.options.targets!) {
       if (platform === Platform.MAC && process.platform === Platform.WINDOWS.nodeName) {
         throw new Error("Build for macOS is supported only on macOS, please see https://github.com/electron-userland/electron-builder/wiki/Multi-Platform-Build")
       }
@@ -121,7 +135,7 @@ export class Packager implements BuildInfo {
       const nameToTarget: Map<String, Target> = new Map()
       platformToTarget.set(platform, nameToTarget)
 
-      for (let [arch, targets] of archToType) {
+      for (const [arch, targets] of archToType) {
         await this.installAppDependencies(platform, arch)
 
         if (checkWine && wineCheck != null) {
@@ -132,7 +146,7 @@ export class Packager implements BuildInfo {
         await helper.pack(outDir, arch, createTargets(nameToTarget, targets, outDir, helper, cleanupTasks), distTasks)
       }
 
-      for (let target of nameToTarget.values()) {
+      for (const target of nameToTarget.values()) {
         distTasks.push(target.finishBuild())
       }
     }
@@ -193,7 +207,7 @@ export class Packager implements BuildInfo {
       }
     }
 
-    const build = <any>this.devMetadata.build
+    const build = <any>this.config
     if (build == null) {
       throw new Error(util.format(errorMessages.buildIsMissed, devAppPackageFile))
     }
@@ -220,10 +234,6 @@ export class Packager implements BuildInfo {
         throw new Error(util.format(errorMessages.nameInBuildSpecified, appPackageFile))
       }
 
-      if (build.directories != null) {
-        throw new Error(`'directories' in the 'build' is not correct. Please move 'directories' from 'build' to root`)
-      }
-
       if (build.prune != null) {
         warn("prune is deprecated — development dependencies are never copied in any case")
       }
@@ -231,11 +241,11 @@ export class Packager implements BuildInfo {
   }
 
   private async installAppDependencies(platform: Platform, arch: Arch): Promise<any> {
-    const options = this.devMetadata.build
+    const options = this.config
     if (options.nodeGypRebuild === true) {
       log(`Executing node-gyp rebuild for arch ${Arch[arch]}`)
       await exec(process.platform === "win32" ? "node-gyp.cmd" : "node-gyp", ["rebuild"], {
-        env: getGypEnv(this.electronVersion, Arch[arch]),
+        env: getGypEnv(this.electronVersion, platform.nodeName, Arch[arch], true),
       })
     }
 
@@ -248,7 +258,7 @@ export class Packager implements BuildInfo {
       log("Skip app dependencies rebuild because platform is different")
     }
     else {
-      await installOrRebuild(options, this.appDir, this.electronVersion, Arch[arch])
+      await installOrRebuild(options, this.appDir, this.electronVersion, platform.nodeName, Arch[arch])
     }
   }
 }
@@ -276,16 +286,16 @@ export function normalizePlatforms(rawPlatforms: Array<string | Platform> | stri
 }
 
 function checkConflictingOptions(options: any) {
-  for (let name of ["all", "out", "tmpdir", "version", "platform", "dir", "arch", "name", "extra-resource"]) {
+  for (const name of ["all", "out", "tmpdir", "version", "platform", "dir", "arch", "name", "extra-resource"]) {
     if (name in options) {
       throw new Error(`Option ${name} is ignored, do not specify it.`)
     }
   }
 }
 
-async function checkWineVersion(checkPromise: Promise<string>) {
+export async function checkWineVersion(checkPromise: Promise<string>) {
   function wineError(prefix: string): string {
-    return `${prefix}, please see https://github.com/electron-userland/electron-builder/wiki/Multi-Platform-Build#${(process.platform === "linux" ? "linux" : "os-x")}`
+    return `${prefix}, please see https://github.com/electron-userland/electron-builder/wiki/Multi-Platform-Build#${(process.platform === "linux" ? "linux" : "macos")}`
   }
 
   let wineVersion: string
@@ -305,6 +315,16 @@ async function checkWineVersion(checkPromise: Promise<string>) {
     wineVersion = wineVersion.substring("wine-".length)
   }
 
+  const spaceIndex = wineVersion.indexOf(" ")
+  if (spaceIndex > 0) {
+    wineVersion = wineVersion.substring(0, spaceIndex)
+  }
+
+  const suffixIndex = wineVersion.indexOf("-")
+  if (suffixIndex > 0) {
+    wineVersion = wineVersion.substring(0, suffixIndex)
+  }
+
   if (wineVersion.split(".").length === 2) {
     wineVersion += ".0"
   }
@@ -319,9 +339,10 @@ function checkDependencies(dependencies?: { [key: string]: string }) {
     return
   }
 
-  for (let name of ["electron", "electron-prebuilt", "electron-builder"]) {
+  for (const name of ["electron", "electron-prebuilt", "electron-builder"]) {
     if (name in dependencies) {
-      throw new Error(`${name} must be in the devDependencies`)
+      throw new Error(`Package "${name}" is only allowed in "devDependencies". `
+        + `Please remove it from the "dependencies" section in your package.json.`)
     }
   }
 }

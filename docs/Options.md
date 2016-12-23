@@ -27,6 +27,7 @@ Don't customize paths to background and icon, — just follow conventions.
   * [Application package.json](#AppMetadata)
   * [Development package.json](#DevMetadata)
     * [.build](#BuildMetadata)
+      * [.build.appx](#AppXOptions)
       * [.build.dmg](#DmgOptions)
       * [.build.dmg.window](#DmgWindow)
       * [.build.fileAssociations](#FileAssociation)
@@ -58,7 +59,6 @@ Don't customize paths to background and icon, — just follow conventions.
 | Name | Description
 | --- | ---
 | **build** | <a name="DevMetadata-build"></a>See [.build](#BuildMetadata).
-| directories | <a name="DevMetadata-directories"></a>See [.directories](#MetadataDirectories)
 
 <a name="BuildMetadata"></a>
 ## `.build`
@@ -70,7 +70,7 @@ Don't customize paths to background and icon, — just follow conventions.
 | files | <a name="BuildMetadata-files"></a><p>A [glob patterns](https://www.npmjs.com/package/glob#glob-primer) relative to the [app directory](#MetadataDirectories-app), which specifies which files to include when copying files to create the package.</p> <p>See [File Patterns](#multiple-glob-patterns).</p>
 | extraResources | <a name="BuildMetadata-extraResources"></a><p>A [glob patterns](https://www.npmjs.com/package/glob#glob-primer) relative to the project directory, when specified, copy the file or directory with matching names directly into the app’s resources directory (<code>Contents/Resources</code> for MacOS, <code>resources</code> for Linux/Windows).</p> <p>Glob rules the same as for [files](#multiple-glob-patterns).</p>
 | extraFiles | <a name="BuildMetadata-extraFiles"></a>The same as [extraResources](#BuildMetadata-extraResources) but copy into the app's content directory (`Contents` for MacOS, root directory for Linux/Windows).
-| asar | <a name="BuildMetadata-asar"></a><p>Whether to package the application’s source code into an archive, using [Electron’s archive format](http://electron.atom.io/docs/tutorial/application-packaging/). Defaults to <code>true</code>. Reasons why you may want to disable this feature are described in [an application packaging tutorial in Electron’s documentation](http://electron.atom.io/docs/tutorial/application-packaging/#limitations-of-the-node-api).</p> <p>Or you can pass object of any asar options.</p> <p>Node modules, that must be unpacked, will be detected automatically, you don’t need to explicitly set <code>asarUnpack</code> - please file issue if this doesn’t work.</p>
+| asar | <a name="BuildMetadata-asar"></a><p>Whether to package the application’s source code into an archive, using [Electron’s archive format](http://electron.atom.io/docs/tutorial/application-packaging/). Defaults to <code>true</code>. Node modules, that must be unpacked, will be detected automatically, you don’t need to explicitly set [asarUnpack](#BuildMetadata-asarUnpack) - please file issue if this doesn’t work.</p> <p>Or you can pass object of asar options.</p>
 | asarUnpack | <a name="BuildMetadata-asarUnpack"></a>A [glob patterns](https://www.npmjs.com/package/glob#glob-primer) relative to the [app directory](#MetadataDirectories-app), which specifies which files to unpack when creating the [asar](http://electron.atom.io/docs/tutorial/application-packaging/) archive.
 | fileAssociations | <a name="BuildMetadata-fileAssociations"></a>The file associations. See [.build.fileAssociations](#FileAssociation).
 | protocols | <a name="BuildMetadata-protocols"></a>The URL protocol scheme(s) to associate the app with. See [.build.protocol](#Protocol).
@@ -91,6 +91,21 @@ Don't customize paths to background and icon, — just follow conventions.
 | electronDist | <a name="BuildMetadata-electronDist"></a>The path to custom Electron build (e.g. `~/electron/out/R`). Only macOS supported, file issue if need for Linux or Windows.
 | electronDownload | <a name="BuildMetadata-electronDownload"></a>The [electron-download](https://github.com/electron-userland/electron-download#usage) options.
 | publish | <a name="BuildMetadata-publish"></a>See [.build.publish](#PublishConfiguration).
+| forceCodeSigning | <a name="BuildMetadata-forceCodeSigning"></a>Whether to fail if application will be not signed (to prevent unsigned app if code signing configuration is not correct).
+| directories | <a name="BuildMetadata-directories"></a>See [.directories](#MetadataDirectories)
+
+<a name="AppXOptions"></a>
+### `.build.appx`
+
+Please see [Windows AppX docs](https://msdn.microsoft.com/en-us/library/windows/apps/br211453.aspx).
+
+| Name | Description
+| --- | ---
+| backgroundColor | <a name="AppXOptions-backgroundColor"></a>The background color of the app tile. Please see [Visual Elements](https://msdn.microsoft.com/en-us/library/windows/apps/br211471.aspx).
+| publisher | <a name="AppXOptions-publisher"></a>Describes the publisher information. The Publisher attribute must match the publisher subject information of the certificate used to sign a package. For now, required.
+| displayName | <a name="AppXOptions-displayName"></a>A friendly name that can be displayed to users. Corresponds to [Properties.DisplayName](https://msdn.microsoft.com/en-us/library/windows/apps/br211432.aspx).
+| publisherDisplayName | <a name="AppXOptions-publisherDisplayName"></a>A friendly name for the publisher that can be displayed to users. Corresponds to [Properties.PublisherDisplayName](https://msdn.microsoft.com/en-us/library/windows/apps/br211460.aspx).
+| identityName | <a name="AppXOptions-identityName"></a>Describes the contents of the package. The Name attribute is case-sensitive. Corresponds to [Identity.Name](https://msdn.microsoft.com/en-us/library/windows/apps/br211441.aspx).
 
 <a name="DmgOptions"></a>
 ### `.build.dmg`
@@ -132,7 +147,8 @@ macOS and NSIS only. Array of option objects.
 | **name** | <a name="FileAssociation-name"></a>The name. e.g. `PNG`.
 | description | <a name="FileAssociation-description"></a>*windows-only.* The description.
 | icon | <a name="FileAssociation-icon"></a>The path to icon (`.icns` for MacOS and `.ico` for Windows), relative to `build` (build resources directory). Defaults to `${firstExt}.icns`/`${firstExt}.ico` (if several extensions specified, first is used) or to application icon.
-| role | <a name="FileAssociation-role"></a>*macOS-only* The app’s role with respect to the type. The value can be `Editor`, `Viewer`, `Shell`, or `None`. Defaults to `Editor`.
+| role | <a name="FileAssociation-role"></a>*macOS-only* The app’s role with respect to the type. The value can be `Editor`, `Viewer`, `Shell`, or `None`. Defaults to `Editor`. Corresponds to `CFBundleTypeRole`.
+| isPackage | <a name="FileAssociation-isPackage"></a>*macOS-only* Whether the document is distributed as a bundle. If set to true, the bundle directory is treated as a file. Corresponds to `LSTypeIsPackage`.
 
 <a name="LinuxBuildOptions"></a>
 ### `.build.linux`
@@ -191,6 +207,7 @@ See [NSIS target notes](https://github.com/electron-userland/electron-builder/wi
 | allowElevation | <a name="NsisOptions-allowElevation"></a>*boring installer only.* Allow requesting for elevation. If false, user will have to restart installer with elevated permissions. Defaults to `true`.
 | runAfterFinish | <a name="NsisOptions-runAfterFinish"></a>*one-click installer only.* Run application after finish. Defaults to `true`.
 | guid | <a name="NsisOptions-guid"></a>See [GUID vs Application Name](https://github.com/electron-userland/electron-builder/wiki/NSIS#guid-vs-application-name).
+| installerIcon | <a name="NsisOptions-installerIcon"></a>The path to installer icon. Defaults to `build/installerIcon.ico` or application icon.
 | installerHeader | <a name="NsisOptions-installerHeader"></a>*boring installer only.* `MUI_HEADERIMAGE`, relative to the project directory. Defaults to `build/installerHeader.bmp`
 | installerHeaderIcon | <a name="NsisOptions-installerHeaderIcon"></a>*one-click installer only.* The path to header icon (above the progress bar), relative to the project directory. Defaults to `build/installerHeaderIcon.ico` or application icon.
 | include | <a name="NsisOptions-include"></a>The path to NSIS include script to customize installer. Defaults to `build/installer.nsh`. See [Custom NSIS script](https://github.com/electron-userland/electron-builder/wiki/NSIS#custom-nsis-script).
@@ -270,14 +287,15 @@ Windows specific build options.
 
 | Name | Description
 | --- | ---
-| target | <a name="WinBuildOptions-target"></a>Target package type: list of `nsis`, `squirrel`, `7z`, `zip`, `tar.xz`, `tar.lz`, `tar.gz`, `tar.bz2`, `dir`. Defaults to `nsis`.
-| signingHashAlgorithms | <a name="WinBuildOptions-signingHashAlgorithms"></a>Array of signing algorithms used. Defaults to `['sha1', 'sha256']`
+| target | <a name="WinBuildOptions-target"></a><p>Target package type: list of <code>nsis</code>, <code>appx</code>, <code>squirrel</code>, <code>7z</code>, <code>zip</code>, <code>tar.xz</code>, <code>tar.lz</code>, <code>tar.gz</code>, <code>tar.bz2</code>, <code>dir</code>. Defaults to <code>nsis</code>.</p> <p>AppX package can be built only on Windows 10.</p>
+| signingHashAlgorithms | <a name="WinBuildOptions-signingHashAlgorithms"></a><p>Array of signing algorithms used. Defaults to <code>['sha1', 'sha256']</code></p> <p>For AppX <code>sha256</code> is always used.</p>
 | icon | <a name="WinBuildOptions-icon"></a>The path to application icon. Defaults to `build/icon.ico` (consider using this convention instead of complicating your configuration).
 | legalTrademarks | <a name="WinBuildOptions-legalTrademarks"></a>The trademarks and registered trademarks.
-| certificateFile | <a name="WinBuildOptions-certificateFile"></a>The path to the *.pfx certificate you want to sign with. Required only if you build on macOS and need different certificate than the one set in `CSC_LINK` - see [Code Signing](https://github.com/electron-userland/electron-builder/wiki/Code-Signing).
-| certificatePassword | <a name="WinBuildOptions-certificatePassword"></a>The password to the certificate provided in `certificateFile`. Required only if you build on macOS and need to use a different password than the one set in `CSC_KEY_PASSWORD` - see [Code Signing](https://github.com/electron-userland/electron-builder/wiki/Code-Signing).
+| certificateFile | <a name="WinBuildOptions-certificateFile"></a><p>The path to the *.pfx certificate you want to sign with. Please use it only if you cannot use env variable <code>CSC_LINK</code> (<code>WIN_CSC_LINK</code>) for some reason. Please see [Code Signing](https://github.com/electron-userland/electron-builder/wiki/Code-Signing).</p>
+| certificatePassword | <a name="WinBuildOptions-certificatePassword"></a><p>The password to the certificate provided in <code>certificateFile</code>. Please use it only if you cannot use env variable <code>CSC_KEY_PASSWORD</code> (<code>WIN_CSC_KEY_PASSWORD</code>) for some reason. Please see [Code Signing](https://github.com/electron-userland/electron-builder/wiki/Code-Signing).</p>
 | certificateSubjectName | <a name="WinBuildOptions-certificateSubjectName"></a>The name of the subject of the signing certificate. Required only for EV Code Signing and works only on Windows.
 | rfc3161TimeStampServer | <a name="WinBuildOptions-rfc3161TimeStampServer"></a>The URL of the RFC 3161 time stamp server. Defaults to `http://timestamp.comodoca.com/rfc3161`.
+| timeStampServer | <a name="WinBuildOptions-timeStampServer"></a>The URL of the time stamp server. Defaults to `http://timestamp.verisign.com/scripts/timstamp.dll`.
 
 <a name="MetadataDirectories"></a>
 ## `.directories`
@@ -306,9 +324,8 @@ Development dependencies are never copied in any case. You don't need to ignore 
 [Multiple patterns](#multiple-glob-patterns) are supported. You can use `${os}` (expanded to mac, linux or win according to current platform) and `${arch}` in the pattern.
 If directory matched, all contents are copied. So, you can just specify `foo` to copy `foo` directory.
 
-Remember that default pattern `**/*` is not added to your custom, so, you have to add it explicitly — e.g. `["**/*", "!ignoreMe${/*}"]`.
-
-`package.json` is added to your custom in any case.
+Remember that default pattern `**/*` **is not added to your custom** if some of your patterns is not ignore (i.e. not starts with `!`).
+ `package.json` is added to your custom in any case.
 
 May be specified in the platform options (e.g. in the `build.mac`).
 

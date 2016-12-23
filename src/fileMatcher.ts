@@ -1,7 +1,8 @@
 import * as path from "path"
-import { createFilter, hasMagic, Filter } from "./util/filter"
+import { createFilter, hasMagic } from "./util/filter"
 import { Minimatch } from "minimatch"
 import { asArray } from "./util/util"
+import { Filter } from "./util/fs"
 
 export interface FilePattern {
   from?: string
@@ -30,8 +31,17 @@ export class FileMatcher {
     this.patterns.push(pattern)
   }
 
+  addAllPattern() {
+    // must be first, see minimatchAll implementation
+    this.patterns.unshift("**/*")
+  }
+
   isEmpty() {
     return this.patterns.length === 0
+  }
+
+  containsOnlyIgnore(): boolean {
+    return !this.isEmpty() && this.patterns.find(it => !it.startsWith("!")) == null
   }
 
   getParsedPatterns(fromDir?: string): Array<Minimatch> {
@@ -41,9 +51,9 @@ export class FileMatcher {
     const parsedPatterns: Array<Minimatch> = []
     const pathDifference = fromDir ? path.relative(fromDir, this.from) : null
 
-    for (let i = 0; i < this.patterns.length; i++) {
-      let expandedPattern = this.expandPattern(this.patterns[i])
-      if (pathDifference) {
+    for (const p of this.patterns) {
+      let expandedPattern = this.expandPattern(p)
+      if (pathDifference != null) {
         expandedPattern = path.join(pathDifference, expandedPattern)
       }
 
@@ -72,10 +82,10 @@ export class FileMatcher {
   }
 }
 
-export function deprecatedUserIgnoreFilter(ignore: any, appDir: string) {
+export function deprecatedUserIgnoreFilter(ignore: Array<RegExp> | ((file: string) => boolean), appDir: string) {
   let ignoreFunc: any
-  if (typeof (ignore) === "function") {
-    ignoreFunc = function (file: string) { return !ignore(file) }
+  if (typeof ignore === "function") {
+    ignoreFunc = function (file: string) { return !(<any>ignore)(file) }
   }
   else {
     if (!Array.isArray(ignore)) {
@@ -83,8 +93,8 @@ export function deprecatedUserIgnoreFilter(ignore: any, appDir: string) {
     }
 
     ignoreFunc = function (file: string) {
-      for (let i = 0; i < ignore.length; i++) {
-        if (file.match(ignore[i])) {
+      for (const i of <Array<RegExp>>ignore) {
+        if (file.match(i)) {
           return false
         }
       }
