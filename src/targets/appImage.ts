@@ -1,6 +1,6 @@
 import { Arch } from "../metadata"
 import * as path from "path"
-import { exec, unlinkIfExists } from "../util/util"
+import { exec } from "../util/util"
 import { open, write, createReadStream, createWriteStream, close, chmod } from "fs-extra-p"
 import { LinuxTargetHelper } from "./LinuxTargetHelper"
 import { getBin } from "../util/binDownload"
@@ -9,6 +9,7 @@ import { v1 as uuid1 } from "uuid-1345"
 import { LinuxPackager } from "../linuxPackager"
 import { log } from "../util/log"
 import { Target } from "./targetFactory"
+import { unlinkIfExists } from "../util/fs"
 
 const appImageVersion = process.platform === "darwin" ? "AppImage-09-07-16-mac" : "AppImage-09-07-16-linux"
 //noinspection SpellCheckingInspection
@@ -17,7 +18,7 @@ const appImageSha256 = process.platform === "darwin" ? "5d4a954876654403698a01ef
 const appImagePathPromise = getBin("AppImage", appImageVersion, `https://dl.bintray.com/electron-userland/bin/${appImageVersion}.7z`, appImageSha256)
 
 export default class AppImageTarget extends Target {
-  private readonly options = Object.assign({}, this.packager.platformSpecificBuildOptions, (<any>this.packager.devMetadata.build)[this.name])
+  private readonly options = Object.assign({}, this.packager.platformSpecificBuildOptions, (<any>this.packager.config)[this.name])
   private readonly desktopEntry: Promise<string>
 
   constructor(ignored: string, private packager: LinuxPackager, private helper: LinuxTargetHelper, private outDir: string) {
@@ -63,7 +64,7 @@ export default class AppImageTarget extends Target {
     args.push("-map", this.helper.maxIconPath, "/.DirIcon")
 
     args.push("-chown_r", "0", "/", "--")
-    args.push("-zisofs", `level=${packager.devMetadata.build.compression === "store" ? "0" : "9"}:block_size=128k:by_magic=off`)
+    args.push("-zisofs", `level=${packager.config.compression === "store" ? "0" : "9"}:block_size=128k:by_magic=off`)
     args.push("set_filter_r", "--zisofs", "/")
 
     if (this.packager.options.effectiveOptionComputed != null && await this.packager.options.effectiveOptionComputed([args, desktopFile])) {

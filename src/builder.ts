@@ -4,12 +4,13 @@ import { PublishOptions, Publisher } from "./publish/publisher"
 import { GitHubPublisher } from "./publish/gitHubPublisher"
 import { executeFinally } from "./util/promise"
 import BluebirdPromise from "bluebird-lst-c"
-import { isEmptyOrSpaces, isCi, debug } from "./util/util"
+import { isEmptyOrSpaces, debug } from "./util/util"
 import { log } from "./util/log"
 import { Platform, Arch, archFromString } from "./metadata"
 import { DIR_TARGET } from "./targets/targetFactory"
 import { BintrayPublisher } from "./publish/BintrayPublisher"
 import { PublishConfiguration, GithubOptions, BintrayOptions } from "./options/publishOptions"
+import isCi from "is-ci"
 
 export interface BuildOptions extends PackagerOptions, PublishOptions {
 }
@@ -82,14 +83,14 @@ export function normalizeOptions(args: CliOptions): BuildOptions {
         archToType.set(Arch.x64, defaultTargetValue)
       }
       else {
-        for (let arch of commonArch()) {
+        for (const arch of commonArch()) {
           archToType.set(arch, defaultTargetValue)
         }
       }
       return
     }
 
-    for (let type of types) {
+    for (const type of types) {
       let arch: string
       if (platform === Platform.MAC) {
         arch = "x64"
@@ -101,7 +102,7 @@ export function normalizeOptions(args: CliOptions): BuildOptions {
           addValue(archToType, archFromString(type.substring(suffixPos + 1)), type.substring(0, suffixPos))
         }
         else {
-          for (let arch of commonArch()) {
+          for (const arch of commonArch()) {
             addValue(archToType, arch, type)
           }
         }
@@ -162,12 +163,12 @@ export function normalizeOptions(args: CliOptions): BuildOptions {
 
 export function createTargets(platforms: Array<Platform>, type?: string | null, arch?: string | null): Map<Platform, Map<Arch, Array<string>>> {
   const targets = new Map<Platform, Map<Arch, Array<string>>>()
-  for (let platform of platforms) {
+  for (const platform of platforms) {
     const archs = platform === Platform.MAC ? [Arch.x64] : (arch === "all" ? [Arch.x64, Arch.ia32] : [archFromString(arch == null ? process.arch : arch)])
     const archToType = new Map<Arch, Array<string>>()
     targets.set(platform, archToType)
 
-    for (let arch of archs) {
+    for (const arch of archs) {
       archToType.set(arch, type == null ? [] : [type])
     }
   }
@@ -209,7 +210,7 @@ export async function build(rawOptions?: CliOptions): Promise<Array<string>> {
         options.publish = "onTag"
         isPublishOptionGuessed = true
       }
-      else if (isCi()) {
+      else if (isCi) {
         log("CI detected, so artifacts will be published if draft release exists")
         options.publish = "onTagOrDraft"
         isPublishOptionGuessed = true
@@ -225,7 +226,7 @@ export async function build(rawOptions?: CliOptions): Promise<Array<string>> {
     if (isAuthTokenSet()) {
       publishManager(packager, publishTasks, options, isPublishOptionGuessed)
     }
-    else if (isCi()) {
+    else if (isCi) {
       log(`CI detected, publish is set to ${options.publish}, but neither GH_TOKEN nor BT_TOKEN is not set, so artifacts will be not published`)
     }
   }
@@ -239,7 +240,7 @@ export async function build(rawOptions?: CliOptions): Promise<Array<string>> {
 
   return await executeFinally(packager.build().then(() => artifactPaths), errorOccurred => {
     if (errorOccurred) {
-      for (let task of publishTasks) {
+      for (const task of publishTasks) {
         task!.cancel()
       }
       return BluebirdPromise.resolve(null)
@@ -274,7 +275,7 @@ function publishManager(packager: Packager, publishTasks: Array<BluebirdPromise<
       return
     }
 
-    for (let publishConfig of publishers) {
+    for (const publishConfig of publishers) {
       const publisher = getOrCreatePublisher(publishConfig)
       if (publisher != null) {
         publisher

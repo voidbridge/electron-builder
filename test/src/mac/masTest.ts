@@ -2,7 +2,6 @@ import { assertPack, signed, CheckingMacPackager, createMacTargetTest } from "..
 import { writeFile } from "fs-extra-p"
 import * as path from "path"
 import BluebirdPromise from "bluebird-lst-c"
-import { assertThat } from "../helpers/fileAssert"
 import { Platform } from "out"
 
 if (process.platform !== "darwin") {
@@ -24,20 +23,18 @@ test("custom mas", () => {
   return assertPack("test-app-one", signed({
     targets: Platform.MAC.createTarget(),
     platformPackagerFactory: (packager, platform, cleanupTasks) => platformPackager = new CheckingMacPackager(packager),
-    devMetadata: {
-      build: {
-        mac: {
-          target: ["mas"],
-        },
-        mas: {
-          entitlements: "mas-entitlements file path",
-          entitlementsInherit: "mas-entitlementsInherit file path",
-        }
+    config: {
+      mac: {
+        target: ["mas"],
+      },
+      mas: {
+        entitlements: "mas-entitlements file path",
+        entitlementsInherit: "mas-entitlementsInherit file path",
       }
     }
   }), {
     packed: () => {
-      assertThat(platformPackager.effectiveSignOptions).hasProperties({
+      expect(platformPackager.effectiveSignOptions).toMatchObject({
         entitlements: "mas-entitlements file path",
         "entitlements-inherit": "mas-entitlementsInherit file path",
       })
@@ -51,17 +48,15 @@ test("entitlements in the package.json", () => {
   return assertPack("test-app-one", signed({
     targets: Platform.MAC.createTarget(),
     platformPackagerFactory: (packager, platform, cleanupTasks) => platformPackager = new CheckingMacPackager(packager),
-    devMetadata: {
-      build: {
-        mac: {
-          entitlements: "osx-entitlements file path",
-          entitlementsInherit: "osx-entitlementsInherit file path",
-        }
+    config: {
+      mac: {
+        entitlements: "osx-entitlements file path",
+        entitlementsInherit: "osx-entitlementsInherit file path",
       }
     }
   }), {
     packed: () => {
-      assertThat(platformPackager.effectiveSignOptions).hasProperties({
+      expect(platformPackager.effectiveSignOptions).toMatchObject({
         entitlements: "osx-entitlements file path",
         "entitlements-inherit": "osx-entitlementsInherit file path",
       })
@@ -81,7 +76,7 @@ test("entitlements in build dir", () => {
       writeFile(path.join(projectDir, "build", "entitlements.mac.inherit.plist"), ""),
     ]),
     packed: context => {
-      assertThat(platformPackager.effectiveSignOptions).hasProperties({
+      expect(platformPackager.effectiveSignOptions).toMatchObject({
         entitlements: path.join(context.projectDir, "build", "entitlements.mac.plist"),
         "entitlements-inherit": path.join(context.projectDir, "build", "entitlements.mac.inherit.plist"),
       })

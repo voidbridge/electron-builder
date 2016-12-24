@@ -2,16 +2,17 @@ import { execFile, spawn as _spawn, ChildProcess, SpawnOptions } from "child_pro
 import BluebirdPromise from "bluebird-lst-c"
 import { homedir } from "os"
 import * as path from "path"
-import { readJson, stat, Stats, unlink, access } from "fs-extra-p"
+import { readJson } from "fs-extra-p"
 import { yellow, red } from "chalk"
 import _debug from "debug"
 import { warn, log } from "./log"
 import { createHash } from "crypto"
 import "source-map-support/register"
-import Debugger = debug.Debugger
+import { statOrNull } from "./fs"
+import { DevMetadata } from "../metadata"
 
-export const debug: Debugger = _debug("electron-builder")
-export const debug7z: Debugger = _debug("electron-builder:7z")
+export const debug = _debug("electron-builder")
+export const debug7z = _debug("electron-builder:7z")
 
 const DEFAULT_APP_DIR_NAMES = ["app", "www"]
 
@@ -29,7 +30,7 @@ export interface ExecOptions extends BaseExecOptions {
   killSignal?: string
 }
 
-export function removePassword(input: string): string {
+export function removePassword(input: string) {
   return input.replace(/(-P |pass:|\/p|-pass )([^ ]+)/, function (match, p1, p2) {
     return `${p1}${createHash("sha256").update(p2).digest("hex")} (sha256 hash)`
   })
@@ -147,7 +148,7 @@ export async function getElectronVersion(packageData: any, packageJsonPath: stri
     return build.electronVersion
   }
 
-  for (let name of ["electron", "electron-prebuilt", "electron-prebuilt-compile"]) {
+  for (const name of ["electron", "electron-prebuilt", "electron-prebuilt-compile"]) {
     try {
       return (await readJson(path.join(path.dirname(packageJsonPath), "node_modules", name, "package.json"))).version
     }
@@ -168,7 +169,7 @@ export async function getElectronVersion(packageData: any, packageJsonPath: stri
 }
 
 function findFromElectronPrebuilt(packageData: any): any {
-  for (let name of ["electron", "electron-prebuilt", "electron-prebuilt-compile"]) {
+  for (const name of ["electron", "electron-prebuilt", "electron-prebuilt-compile"]) {
     const devDependencies = packageData.devDependencies
     let dep = devDependencies == null ? null : devDependencies[name]
     if (dep == null) {
@@ -180,30 +181,6 @@ function findFromElectronPrebuilt(packageData: any): any {
     }
   }
   return null
-}
-
-export async function statOrNull(file: string): Promise<Stats | null> {
-  try {
-    return await stat(file)
-  }
-  catch (e) {
-    if (e.code === "ENOENT") {
-      return null
-    }
-    else {
-      throw e
-    }
-  }
-}
-
-export async function exists(file: string): Promise<boolean> {
-  try {
-    await access(file)
-    return true
-  }
-  catch (e) {
-    return false
-  }
 }
 
 export async function computeDefaultAppDirectory(projectDir: string, userAppDir: string | null | undefined): Promise<string> {
@@ -222,7 +199,7 @@ export async function computeDefaultAppDirectory(projectDir: string, userAppDir:
     return absolutePath
   }
 
-  for (let dir of DEFAULT_APP_DIR_NAMES) {
+  for (const dir of DEFAULT_APP_DIR_NAMES) {
     const absolutePath = path.join(projectDir, dir)
     const packageJson = path.join(absolutePath, "package.json")
     const stat = await statOrNull(packageJson)
@@ -248,7 +225,7 @@ export function debug7zArgs(command: "a" | "x"): Array<string> {
   return args
 }
 
-let tmpDirCounter = 0
+export let tmpDirCounter = 0
 // add date to avoid use stale temp dir
 const tempDirPrefix = `${process.pid.toString(16)}-${Date.now().toString(16)}`
 
@@ -258,13 +235,6 @@ export function getTempName(prefix?: string | n): string {
 
 export function isEmptyOrSpaces(s: string | n) {
   return s == null || s.trim().length === 0
-}
-
-export function unlinkIfExists(file: string) {
-  return unlink(file)
-    .catch(() => {
-      // ignore
-    })
 }
 
 export function asArray<T>(v: n | T | Array<T>): Array<T> {
@@ -278,10 +248,6 @@ export function asArray<T>(v: n | T | Array<T>): Array<T> {
     return [v]
   }
 }
-export function isCi(): boolean {
-  return (process.env.CI || "").toLowerCase() === "true"
-}
-
 export function getCacheDirectory(): string {
   if (process.platform === "darwin") {
     return path.join(homedir(), "Library", "Caches", "electron-builder")
@@ -292,4 +258,8 @@ export function getCacheDirectory(): string {
   else {
     return path.join(homedir(), ".cache", "electron-builder")
   }
+}
+
+export function getDirectoriesConfig(m: DevMetadata) {
+  return m.build.directories || (<any>m).directories
 }

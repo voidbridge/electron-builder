@@ -1,10 +1,11 @@
 import BluebirdPromise from "bluebird-lst-c"
-import { emptyDir, copy, chmod } from "fs-extra-p"
+import { emptyDir, chmod } from "fs-extra-p"
 import { warn } from "../util/log"
 import { PlatformPackager } from "../platformPackager"
 import { debug7zArgs, spawn } from "../util/util"
 import { path7za } from "7zip-bin"
 import * as path from "path"
+import { copyDir } from "../util/fs"
 
 const downloadElectron: (options: any) => Promise<any> = BluebirdPromise.promisify(require("electron-download-tf"))
 
@@ -32,10 +33,10 @@ function subOptionWarning (properties: any, optionName: any, parameter: any, val
 }
 
 export async function unpackElectron(packager: PlatformPackager<any>, out: string, platform: string, arch: string, electronVersion: string) {
-  const electronDist = packager.devMetadata.build.electronDist
+  const electronDist = packager.config.electronDist
   if (electronDist == null) {
     const zipPath = (await BluebirdPromise.all<any>([
-      downloadElectron(createDownloadOpts(packager.devMetadata.build, platform, arch, electronVersion)),
+      downloadElectron(createDownloadOpts(packager.config, platform, arch, electronVersion)),
       emptyDir(out)
     ]))[0]
 
@@ -43,7 +44,7 @@ export async function unpackElectron(packager: PlatformPackager<any>, out: strin
   }
   else {
     await emptyDir(out)
-    await copy(path.resolve(packager.info.projectDir, electronDist, "Electron.app"), path.join(out, "Electron.app"))
+    await copyDir(path.resolve(packager.info.projectDir, electronDist, "Electron.app"), path.join(out, "Electron.app"))
   }
 
   if (platform === "linux") {

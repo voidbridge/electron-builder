@@ -12,6 +12,8 @@ import { readFile } from "fs-extra-p"
 import { safeLoad } from "js-yaml"
 import { GenericProvider } from "./GenericProvider"
 import { GitHubProvider } from "./GitHubProvider"
+import { executorHolder } from "../../src/util/httpExecutor"
+import { ElectronHttpExecutor } from "./electronHttpExecutor"
 
 export class NsisUpdater extends EventEmitter {
   private setupPath: string | null
@@ -21,6 +23,8 @@ export class NsisUpdater extends EventEmitter {
 
   private clientPromise: Promise<Provider<any>>
 
+  private readonly untilAppReady: Promise<boolean>
+
   private readonly app: any
 
   private quitHandlerAdded = false
@@ -28,12 +32,25 @@ export class NsisUpdater extends EventEmitter {
   constructor(options?: PublishConfiguration | BintrayOptions | GithubOptions) {
     super()
 
-    this.app = (<any>global).__test_app || require("electron").app
-
-    if (options == null) {
-      this.clientPromise = this.loadUpdateConfig()
+    if ((<any>global).__test_app) {
+      this.app = (<any>global).__test_app
+      this.untilAppReady = BluebirdPromise.resolve()
     }
     else {
+      this.app = require("electron").app
+      executorHolder.httpExecutor = new ElectronHttpExecutor()
+      this.untilAppReady = new BluebirdPromise((resolve, reject) => {
+        if (this.app.isReady()) {
+          resolve()
+        }
+        else {
+          this.app.on("ready", resolve)
+        }
+      })
+    }
+
+
+    if (options != null) {
       this.setFeedURL(options)
     }
   }
@@ -47,15 +64,12 @@ export class NsisUpdater extends EventEmitter {
   }
 
   async checkForUpdates(): Promise<UpdateCheckResult> {
-    if (this.clientPromise == null) {
-      const message = "Update URL is not set"
-      const error = new Error(message)
-      this.emit("error", error, message)
-      throw error
-    }
-
+    await this.untilAppReady
     this.emit("checking-for-update")
     try {
+      if (this.clientPromise == null) {
+        this.clientPromise = NsisUpdater.loadUpdateConfig()
+      }
       return await this.doCheckForUpdates()
     }
     catch (e) {
@@ -145,7 +159,11 @@ export class NsisUpdater extends EventEmitter {
     // prevent calling several times
     this.quitAndInstallCalled = true
 
-    spawn(setupPath, isSilent ? ["/S"] : [], {
+    const args = ["--updated"]
+    if (isSilent) {
+      args.push("/S")
+    }
+    spawn(setupPath, args, {
       detached: true,
       stdio: "ignore",
     }).unref()
@@ -153,14 +171,8 @@ export class NsisUpdater extends EventEmitter {
     return true
   }
 
-  async loadUpdateConfig() {
-    try {
-      return createClient(safeLoad(await readFile(path.join((<any>global).__test_resourcesPath || (<any>process).resourcesPath, "app-update.yml"), "utf-8")))
-    }
-    catch (e) {
-      this.emit("error", e, (e.stack || e).toString())
-      throw e
-    }
+  private static async loadUpdateConfig() {
+    return createClient(safeLoad(await readFile(path.join((<any>global).__test_resourcesPath || (<any>process).resourcesPath, "app-update.yml"), "utf-8")))
   }
 }
 
@@ -168,13 +180,16 @@ function createClient(data: string | PublishConfiguration | BintrayOptions | Git
   if (typeof data === "string") {
     throw new Error("Please pass PublishConfiguration object")
   }
-  else {
-    const provider = (<PublishConfiguration>data).provider
-    switch (provider) {
-      case "github": return new GitHubProvider(<GithubOptions>data)
-      case "generic": return new GenericProvider(<GenericServerOptions>data)
-      case "bintray":  return new BintrayProvider(<BintrayOptions>data)
-      default: throw new Error(`Unsupported provider: ${provider}`)
-    }
+
+  const provider = (<PublishConfiguration>data).provider
+  switch (provider) {
+    case "github":
+      return new GitHubProvider(<GithubOptions>data)
+    case "generic":
+      return new GenericProvider(<GenericServerOptions>data)
+    case "bintray":
+      return new BintrayProvider(<BintrayOptions>data)
+    default:
+      throw new Error(`Unsupported provider: ${provider}`)
   }
 }

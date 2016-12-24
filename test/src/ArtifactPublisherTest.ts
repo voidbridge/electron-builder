@@ -1,13 +1,19 @@
 import { GitHubPublisher } from "out/publish/gitHubPublisher"
-import { HttpError } from "out/publish/restApiRequest"
 import { join } from "path"
-import { assertThat } from "./helpers/fileAssert"
 import { BintrayPublisher } from "out/publish/BintrayPublisher"
 import { createPublisher } from "out/builder"
+import isCi from "is-ci"
+import { HttpError } from "out/util/httpExecutor"
 
-if (process.env.CI && process.platform === "win32") {
+if (isCi && process.platform === "win32") {
   fit("Skip ArtifactPublisherTest suite on Windows CI", () => {
     console.warn("[SKIP] Skip ArtifactPublisherTest suite on Windows CI")
+  })
+}
+
+if (process.env.ELECTRON_BUILDER_OFFLINE === "true") {
+  fit("Skip ArtifactPublisherTest suite — ELECTRON_BUILDER_OFFLINE is defined", () => {
+    console.warn("[SKIP] Skip ArtifactPublisherTest suite — ELECTRON_BUILDER_OFFLINE is defined")
   })
 }
 
@@ -87,7 +93,7 @@ testAndIgnoreApiRate("prerelease", async () => {
   try {
     await publisher.upload(iconPath)
     const r = await publisher.getRelease()
-    assertThat(r).hasProperties({
+    expect(r).toMatchObject({
       prerelease: true,
       draft: false,
     })
@@ -112,14 +118,12 @@ it("create publisher", async () => {
   const packager: any = {
     metadata: {
       version: "2.0.0",
-    },
-    devMetadata: {
       repository: "develar/test"
     },
   }
   const publisher = await createPublisher(packager, {provider: "github", vPrefixedTagName: false, token: "__test__"}, {})
 
-  assertThat(publisher).hasProperties({
+  expect(publisher).toMatchObject({
     info: {
       provider: "github",
       vPrefixedTagName: false,

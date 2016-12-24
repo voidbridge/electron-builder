@@ -1,24 +1,10 @@
-import { copy, emptyDir, remove, writeJson, readJson, readFile, mkdir } from "fs-extra-p"
+import { emptyDir, remove, writeJson, readJson, readFile, mkdir } from "fs-extra-p"
 import { assertThat } from "./fileAssert"
 import * as path from "path"
 import { parse as parsePlist } from "plist"
 import { CSC_LINK } from "./codeSignData"
 import { expectedLinuxContents, expectedWinContents } from "./expectedContents"
-import {
-  Packager,
-  PackagerOptions,
-  Platform,
-  ArtifactCreated,
-  Arch,
-  DIR_TARGET,
-  createTargets,
-  getArchSuffix,
-  MacOsTargetName,
-  Target,
-  MacOptions,
-  BuildInfo,
-  SquirrelWindowsOptions
-} from "out"
+import { Packager, PackagerOptions, Platform, ArtifactCreated, Arch, DIR_TARGET, createTargets, getArchSuffix, MacOsTargetName, Target, MacOptions, BuildInfo, SquirrelWindowsOptions } from "out"
 import { exec, spawn, getTempName } from "out/util/util"
 import { log, warn } from "out/util/log"
 import pathSorter from "path-sort"
@@ -32,6 +18,8 @@ import SquirrelWindowsTarget from "out/targets/squirrelWindows"
 import { DmgTarget } from "out/targets/dmg"
 import OsXPackager from "out/macPackager"
 import { SignOptions as MacSignOptions } from "electron-macos-sign"
+import { copyDir, FileCopier } from "out/util/fs"
+import isCi from "is-ci"
 
 if (process.env.TRAVIS !== "true") {
   process.env.CIRCLE_BUILD_NUM = 42
@@ -46,6 +34,7 @@ interface AssertPackOptions {
   readonly expectedArtifacts?: Array<string>
 
   readonly expectedDepends?: string
+  readonly checkMacApp?: (appDir: string, info: any) => Promise<any>
 
   readonly useTempDir?: boolean
   readonly signed?: boolean
@@ -78,13 +67,17 @@ export function app(packagerOptions: PackagerOptions, checkOptions: AssertPackOp
   return () => assertPack("test-app-one", packagerOptions, checkOptions)
 }
 
+export function appTwo(packagerOptions: PackagerOptions, checkOptions: AssertPackOptions = {}) {
+  return () => assertPack("test-app", packagerOptions, checkOptions)
+}
+
 export async function assertPack(fixtureName: string, packagerOptions: PackagerOptions, checkOptions: AssertPackOptions = {}): Promise<void> {
   if (checkOptions.signed) {
     packagerOptions = signed(packagerOptions)
   }
 
   const projectDirCreated = checkOptions.projectDirCreated
-  const useTempDir = process.env.TEST_APP_TMP_DIR != null || (checkOptions.useTempDir !== false && (checkOptions.useTempDir || projectDirCreated != null || packagerOptions.devMetadata != null || checkOptions.npmInstallBefore))
+  const useTempDir = process.env.TEST_APP_TMP_DIR != null || (checkOptions.useTempDir !== false && (checkOptions.useTempDir || projectDirCreated != null || packagerOptions.config != null || checkOptions.npmInstallBefore))
 
   let projectDir = path.join(__dirname, "..", "..", "fixtures", fixtureName)
   // const isDoNotUseTempDir = platform === "darwin"
@@ -100,12 +93,10 @@ export async function assertPack(fixtureName: string, packagerOptions: PackagerO
       log(`Custom temp dir used: ${customTmpDir}`)
     }
     await emptyDir(dir)
-    await copy(projectDir, dir, {
-      filter: it => {
-        const basename = path.basename(it)
-        return basename !== OUT_DIR_NAME && basename !== "node_modules" && basename[0] !== "."
-      }
-    })
+    await copyDir(projectDir, dir, it => {
+      const basename = path.basename(it)
+      return basename !== OUT_DIR_NAME && basename !== "node_modules" && !basename.startsWith(".")
+    }, it => path.basename(it) != "package.json")
     projectDir = dir
   }
 
@@ -122,11 +113,11 @@ export async function assertPack(fixtureName: string, packagerOptions: PackagerO
     // never output to test fixture app
     if (!useTempDir) {
       dirToDelete = path.join(testDir, `${(tmpDirCounter++).toString(16)}`)
-      const devMetadata = packagerOptions.devMetadata
-      if (devMetadata != null && devMetadata.directories != null) {
+      const config = packagerOptions.config
+      if (config != null && config.directories != null) {
         throw new Error("unsupported")
       }
-      packagerOptions = deepAssign({}, packagerOptions, {devMetadata: {directories: {output: dirToDelete}}})
+      packagerOptions = deepAssign({}, packagerOptions, {config: {directories: {output: dirToDelete}}})
     }
 
     const outDir = useTempDir ? path.join(projectDir, OUT_DIR_NAME) : dirToDelete
@@ -160,8 +151,10 @@ export async function assertPack(fixtureName: string, packagerOptions: PackagerO
   }
 }
 
-export function getTestAsset(file: string) {
-  return path.join(__dirname, "..", "..", "fixtures", file)
+const fileCopier = new FileCopier()
+
+export function copyTestAsset(name: string, destination: string): Promise<void> {
+  return fileCopier.copy(path.join(__dirname, "..", "..", "fixtures", name), destination, undefined)
 }
 
 async function packAndCheck(outDir: string, packagerOptions: PackagerOptions, checkOptions: AssertPackOptions): Promise<Packager> {
@@ -184,15 +177,15 @@ async function packAndCheck(outDir: string, packagerOptions: PackagerOptions, ch
     return packager
   }
 
-  c: for (let [platform, archToType] of packagerOptions.targets) {
-    for (let [arch, targets] of archToType) {
+  c: for (const [platform, archToType] of packagerOptions.targets) {
+    for (const [arch, targets] of archToType) {
       if (targets.length === 1 && targets[0] === DIR_TARGET) {
         continue c
       }
 
       const nameToTarget = platformToTarget.get(platform)
       if (platform === Platform.MAC) {
-        await checkOsXResult(packager, packagerOptions, checkOptions, artifacts.get(Platform.MAC))
+        await checkMacResult(packager, packagerOptions, checkOptions, artifacts.get(Platform.MAC))
       }
       else if (platform === Platform.LINUX) {
         await checkLinuxResult(outDir, packager, checkOptions, artifacts.get(Platform.LINUX), arch, nameToTarget)
@@ -211,7 +204,7 @@ async function checkLinuxResult(outDir: string, packager: Packager, checkOptions
 
   function getExpected(): Array<string> {
     const result: Array<string> = []
-    for (let target of nameToTarget.keys()) {
+    for (const target of nameToTarget.keys()) {
       if (target === "appimage") {
         result.push(`${appInfo.name}-${appInfo.version}-${arch === Arch.x64 ? "x86_64" : Arch[arch]}.AppImage`)
       }
@@ -250,7 +243,7 @@ async function checkLinuxResult(outDir: string, packager: Packager, checkOptions
     expect(await getContents(`${outDir}/TestApp_${appInfo.version}_i386.deb`)).toEqual(expectedContents)
   }
 
-  assertThat(parseDebControl(await exec("dpkg", ["--info", packageFile]))).hasProperties({
+  expect(parseDebControl(await exec("dpkg", ["--info", packageFile]))).toMatchObject({
     License: "MIT",
     Homepage: "http://foo.example.com",
     Maintainer: "Foo Bar <foo@example.com>",
@@ -281,16 +274,22 @@ function parseDebControl(info: string): any {
   return metadata
 }
 
-async function checkOsXResult(packager: Packager, packagerOptions: PackagerOptions, checkOptions: AssertPackOptions, artifacts: Array<ArtifactCreated>) {
+async function checkMacResult(packager: Packager, packagerOptions: PackagerOptions, checkOptions: AssertPackOptions, artifacts: Array<ArtifactCreated>) {
   const appInfo = packager.appInfo
   const packedAppDir = path.join(path.dirname(artifacts[0].file), `${appInfo.productFilename}.app`)
   const info = parsePlist(await readFile(path.join(packedAppDir, "Contents", "Info.plist"), "utf8"))
-  assertThat(info).hasProperties({
+  expect(info).toMatchObject({
     CFBundleDisplayName: appInfo.productName,
     CFBundleIdentifier: "org.electron-builder.testApp",
     LSApplicationCategoryType: "your.app.category.type",
     CFBundleVersion: `${appInfo.version}.${(process.env.TRAVIS_BUILD_NUMBER || process.env.CIRCLE_BUILD_NUM)}`
   })
+
+  // checked manually, remove to avoid mismatch on CI server (where TRAVIS_BUILD_NUMBER is defined and different on each test run)
+  delete info.CFBundleVersion
+  if (checkOptions.checkMacApp != null) {
+    await checkOptions.checkMacApp(packedAppDir, info)
+  }
 
   if (packagerOptions.cscLink != null) {
     const result = await exec("codesign", ["--verify", packedAppDir])
@@ -325,8 +324,8 @@ async function checkWindowsResult(packager: Packager, checkOptions: AssertPackOp
   const artifactNames: Array<string> = []
   const expectedFileNames: Array<string> = []
   const archSuffix = getArchSuffix(arch)
-  const buildOptions = packager.devMetadata.build.win
-  for (let target of nameToTarget.keys()) {
+  const buildOptions = packager.config.win
+  for (const target of nameToTarget.keys()) {
     if (target === "squirrel") {
       squirrel = true
       expectedFileNames.push("RELEASES", `${appInfo.productFilename} Setup ${appInfo.version}${archSuffix}.exe`, `${appInfo.name}-${convertVersion(appInfo.version)}-full.nupkg`)
@@ -370,6 +369,12 @@ async function checkWindowsResult(packager: Packager, checkOptions: AssertPackOp
       }
       return `lib/net45/${encodeURI(appInfo.productFilename).replace(/%5B/g, "[").replace(/%5D/g, "]")}.exe`
     }
+    else if (it === "lib/net45/TestApp_ExecutionStub.exe") {
+      if (appInfo.productFilename === "Test App ßW") {
+        return `lib/net45/Test%20App%20%C3%9FW_ExecutionStub.exe`
+      }
+      return `lib/net45/${encodeURI(appInfo.productFilename).replace(/%5B/g, "[").replace(/%5D/g, "]")}_ExecutionStub.exe`
+    }
     else {
       return it
     }
@@ -408,11 +413,11 @@ async function getContents(path: string) {
     )
 }
 
-export function packageJson(task: (data: any) => void, isApp: boolean = false) {
+export function packageJson(task: (data: any) => void, isApp = false) {
   return (projectDir: string) => modifyPackageJson(projectDir, task, isApp)
 }
 
-export async function modifyPackageJson(projectDir: string, task: (data: any) => void, isApp: boolean = false): Promise<any> {
+export async function modifyPackageJson(projectDir: string, task: (data: any) => void, isApp = false): Promise<any> {
   const file = isApp ? path.join(projectDir, "app", "package.json") : path.join(projectDir, "package.json")
   const data = await readJson(file)
   task(data)
@@ -439,7 +444,7 @@ export function getPossiblePlatforms(type?: string): Map<Platform, Map<Arch, str
   const platforms = [Platform.fromString(process.platform)]
   if (process.platform === Platform.MAC.nodeName) {
     platforms.push(Platform.LINUX)
-    if (process.env.CI == null) {
+    if (!isCi) {
       platforms.push(Platform.WINDOWS)
     }
   }
@@ -483,7 +488,7 @@ export class CheckingMacPackager extends OsXPackager {
   }
 
   async pack(outDir: string, arch: Arch, targets: Array<Target>, postAsyncTasks: Array<Promise<any>>): Promise<any> {
-    for (let target of targets) {
+    for (const target of targets) {
       // do not use instanceof to avoid dmg require
       if (target.name === "dmg") {
         this.effectiveDistOptions = await (<DmgTarget>target).computeDmgOptions()
@@ -514,11 +519,9 @@ export class CheckingMacPackager extends OsXPackager {
 export function createMacTargetTest(target: Array<MacOsTargetName>, expectedContents: Array<string>) {
   return app({
     targets: Platform.MAC.createTarget(),
-    devMetadata: {
-      build: {
-        mac: {
-          target: target,
-        }
+    config: {
+      mac: {
+        target: target,
       }
     }
   }, {
@@ -538,7 +541,7 @@ export function createMacTargetTest(target: Array<MacOsTargetName>, expectedCont
   })
 }
 
-export function allPlatforms(dist: boolean = true): PackagerOptions {
+export function allPlatforms(dist = true): PackagerOptions {
   return {
     targets: getPossiblePlatforms(dist ? null : DIR_TARGET),
   }

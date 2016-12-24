@@ -4,9 +4,13 @@ import * as path from "path"
 import { TmpDir } from "out/util/tmp"
 import { outputFile } from "fs-extra-p"
 import { safeDump } from "js-yaml"
-import { GenericServerOptions } from "out/options/publishOptions"
-import { GithubOptions } from "out/options/publishOptions"
-import BluebirdPromise from "bluebird-lst-c"
+import { GenericServerOptions, GithubOptions } from "out/options/publishOptions"
+
+if (process.env.ELECTRON_BUILDER_OFFLINE === "true") {
+  fit("Skip ArtifactPublisherTest suite — ELECTRON_BUILDER_OFFLINE is defined", () => {
+    console.warn("[SKIP] Skip ArtifactPublisherTest suite — ELECTRON_BUILDER_OFFLINE is defined")
+  })
+}
 
 const NsisUpdaterClass = require("../../nsis-auto-updater/out/nsis-auto-updater/src/NsisUpdater").NsisUpdater
 
@@ -54,16 +58,14 @@ test("file url", async () => {
 
   const actualEvents: Array<string> = []
   const expectedEvents = ["checking-for-update", "update-available", "update-downloaded"]
-  for (let eventName of expectedEvents) {
+  for (const eventName of expectedEvents) {
     updater.addListener(eventName, () => {
       actualEvents.push(eventName)
     })
   }
 
   const updateCheckResult = await updater.checkForUpdates()
-  assertThat(updateCheckResult.fileInfo).hasProperties({
-    url: "https://dl.bintray.com/actperepo/generic/TestApp Setup 1.1.0.exe"
-  })
+  expect(updateCheckResult.fileInfo).toMatchSnapshot()
   await assertThat(path.join(await updateCheckResult.downloadPromise)).isFile()
 
   expect(actualEvents).toEqual(expectedEvents)
@@ -81,16 +83,14 @@ test("file url generic", async () => {
 
   const actualEvents: Array<string> = []
   const expectedEvents = ["checking-for-update", "update-available", "update-downloaded"]
-  for (let eventName of expectedEvents) {
+  for (const eventName of expectedEvents) {
     updater.addListener(eventName, () => {
       actualEvents.push(eventName)
     })
   }
 
   const updateCheckResult = await updater.checkForUpdates()
-  assertThat(updateCheckResult.fileInfo).hasProperties({
-    url: "https://develar.s3.amazonaws.com/test/TestApp Setup 1.1.0.exe"
-  })
+  expect(updateCheckResult.fileInfo).toMatchSnapshot()
   await assertThat(path.join(await updateCheckResult.downloadPromise)).isFile()
 
   expect(actualEvents).toEqual(expectedEvents)
@@ -109,43 +109,31 @@ test("file url github", async () => {
 
   const actualEvents: Array<string> = []
   const expectedEvents = ["checking-for-update", "update-available", "update-downloaded"]
-  for (let eventName of expectedEvents) {
+  for (const eventName of expectedEvents) {
     updater.addListener(eventName, () => {
       actualEvents.push(eventName)
     })
   }
 
   const updateCheckResult = await updater.checkForUpdates()
-  assertThat(updateCheckResult.fileInfo).hasProperties({
-    url: "https://github.com/develar/__test_nsis_release/releases/download/v1.1.0/TestApp-Setup-1.1.0.exe"
-  })
+  expect(updateCheckResult.fileInfo).toMatchSnapshot()
   await assertThat(path.join(await updateCheckResult.downloadPromise)).isFile()
 
   expect(actualEvents).toEqual(expectedEvents)
 })
 
 test("test error", async () => {
+  g.__test_resourcesPath = null
   const updater: NsisUpdater = new NsisUpdaterClass()
 
   const actualEvents: Array<string> = []
-  const expectedEvents = ["checking-for-update", "error"]
-  for (let eventName of expectedEvents) {
+  const expectedEvents = ["checking-for-update", "error", "error"]
+  for (const eventName of expectedEvents) {
     updater.addListener(eventName, () => {
       actualEvents.push(eventName)
     })
   }
 
   await assertThat(updater.checkForUpdates()).throws("Path must be a string. Received undefined")
-  await new BluebirdPromise(function (resolve, reject) {
-    setTimeout(() => {
-      try {
-        expect(actualEvents).toEqual(expectedEvents)
-      }
-      catch (e) {
-        reject(e)
-      }
-
-      resolve()
-    }, 500)
-  })
+  expect(actualEvents).toEqual(expectedEvents)
 })

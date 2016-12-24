@@ -1,12 +1,12 @@
 import { Platform } from "out"
 import { assertPack, platform, modifyPackageJson, app, appThrows, CheckingWinPackager } from "../helpers/packTester"
-import { outputFile, rename } from "fs-extra-p"
+import { writeFile, rename, unlink } from "fs-extra-p"
 import * as path from "path"
 import BluebirdPromise from "bluebird-lst-c"
 
 test.ifDevOrWinCi("beta version", app({
   targets: Platform.WINDOWS.createTarget(["squirrel", "nsis"]),
-  devMetadata: <any>{
+  appMetadata: <any>{
     version: "3.0.0-beta.2",
   }
 }))
@@ -16,7 +16,12 @@ test.ifNotCiMac("icon < 256", appThrows(/Windows icon size must be at least 256x
 }))
 
 test.ifNotCiMac("icon not an image", appThrows(/Windows icon is not valid ico file, please fix ".+/, platform(Platform.WINDOWS), {
-  projectDirCreated: projectDir => outputFile(path.join(projectDir, "build", "icon.ico"), "foo")
+  projectDirCreated: async (projectDir) => {
+    const file = path.join(projectDir, "build", "icon.ico")
+    // because we use hardlinks
+    await unlink(file)
+    await writeFile(file, "foo")
+  }
 }))
 
 test.ifMac("custom icon", () => {
@@ -41,11 +46,16 @@ test.ifMac("custom icon", () => {
 
 it.ifDevOrLinuxCi("ev", appThrows(/certificateSubjectName supported only on Windows/, {
   targets: Platform.WINDOWS.createTarget(["dir"]),
-  devMetadata: {
-    build: {
-      win: {
-        certificateSubjectName: "ev",
-      }
+  config: {
+    win: {
+      certificateSubjectName: "ev",
     }
+  }
+}))
+
+it.ifDevOrLinuxCi("forceCodeSigning", appThrows(/App is not signed and "forceCodeSigning"/, {
+  targets: Platform.WINDOWS.createTarget(["dir"]),
+  config: {
+    forceCodeSigning: true,
   }
 }))

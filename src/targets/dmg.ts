@@ -4,12 +4,13 @@ import { log, warn } from "../util/log"
 import { PlatformPackager } from "../platformPackager"
 import { MacOptions, DmgOptions, DmgContent } from "../options/macOptions"
 import BluebirdPromise from "bluebird-lst-c"
-import { debug, use, exec, statOrNull, isEmptyOrSpaces, spawn, exists } from "../util/util"
+import { debug, use, exec, isEmptyOrSpaces, spawn } from "../util/util"
 import { copy, unlink, outputFile, remove } from "fs-extra-p"
 import { executeFinally } from "../util/promise"
 import sanitizeFileName from "sanitize-filename"
 import { Arch } from "../metadata"
 import { Target } from "./targetFactory"
+import { exists, statOrNull } from "../util/fs"
 
 export class DmgTarget extends Target {
   private helperDir = path.join(__dirname, "..", "..", "templates", "dmg")
@@ -153,7 +154,7 @@ export class DmgTarget extends Target {
 
     const artifactPath = path.join(appOutDir, `${appInfo.productFilename}-${appInfo.version}.dmg`)
     //noinspection SpellCheckingInspection
-    await spawn("hdiutil", addVerboseIfNeed(["convert", tempDmg, "-format", packager.devMetadata.build.compression === "store" ? "UDRO" : "UDBZ", "-imagekey", "zlib-level=9", "-o", artifactPath]))
+    await spawn("hdiutil", addVerboseIfNeed(["convert", tempDmg, "-format", packager.config.compression === "store" ? "UDRO" : "UDBZ", "-imagekey", "zlib-level=9", "-o", artifactPath]))
     await exec("hdiutil", addVerboseIfNeed(["internet-enable", "-no"]).concat(artifactPath))
 
     this.packager.dispatchArtifactCreated(artifactPath, `${appInfo.name}-${appInfo.version}.dmg`)
@@ -179,7 +180,7 @@ export class DmgTarget extends Target {
         x: 400,
         y: 100,
       },
-    }, packager.devMetadata.build.dmg)
+    }, packager.config.dmg)
 
     // appdmg
     const oldPosition = specification.window.position
@@ -240,7 +241,7 @@ export class DmgTarget extends Target {
     }
 
     if (specification.format == null) {
-      specification.format = packager.devMetadata.build.compression === "store" ? "UDRO" : "UDBZ"
+      specification.format = packager.config.compression === "store" ? "UDRO" : "UDBZ"
     }
 
     return specification

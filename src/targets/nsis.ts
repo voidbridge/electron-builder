@@ -15,9 +15,9 @@ import { safeDump } from "js-yaml"
 import { createHash } from "crypto"
 import { Target } from "./targetFactory"
 
-const NSIS_VERSION = "3.0.2"
+const NSIS_VERSION = "3.0.4"
 //noinspection SpellCheckingInspection
-const NSIS_SHA2 = "012c29d62e167ff74e858eeb929641dc2c9d7bfe7465e748648814660c61b419"
+const NSIS_SHA2 = "c29883cb9a04733489590420b910ea7a91ba0f9b776fe4c647d9801f23175225"
 
 //noinspection SpellCheckingInspection
 const ELECTRON_BUILDER_NS_UUID = "50e065bc-3134-11e6-9bab-38c9862bdaf3"
@@ -25,7 +25,7 @@ const ELECTRON_BUILDER_NS_UUID = "50e065bc-3134-11e6-9bab-38c9862bdaf3"
 const nsisPathPromise = getBinFromBintray("nsis", NSIS_VERSION, NSIS_SHA2)
 
 export default class NsisTarget extends Target {
-  private readonly options: NsisOptions = this.packager.info.devMetadata.build.nsis || Object.create(null)
+  private readonly options: NsisOptions = this.packager.config.nsis || Object.create(null)
 
   private archs: Map<Arch, Promise<string>> = new Map()
 
@@ -67,7 +67,7 @@ export default class NsisTarget extends Target {
 
     const packager = this.packager
     const archiveFile = path.join(this.outDir, `${packager.appInfo.name}-${packager.appInfo.version}-${Arch[arch]}.nsis.7z`)
-    return await archive(packager.devMetadata.build.compression, "7z", archiveFile, appOutDir, true)
+    return await archive(packager.config.compression, "7z", archiveFile, appOutDir, true)
   }
 
   async finishBuild(): Promise<any> {
@@ -87,7 +87,7 @@ export default class NsisTarget extends Target {
     const appInfo = packager.appInfo
     const version = appInfo.version
     const installerFilename = `${appInfo.productFilename} Setup ${version}.exe`
-    const iconPath = await packager.getIconPath()
+    const iconPath = await packager.getResource(this.options.installerIcon, "installerIcon.ico") || await packager.getIconPath()
 
     const installerPath = path.join(this.outDir, installerFilename)
     const guid = this.options.guid || await BluebirdPromise.promisify(uuid5)({namespace: ELECTRON_BUILDER_NS_UUID, name: appInfo.id})
@@ -96,13 +96,14 @@ export default class NsisTarget extends Target {
       APP_GUID: guid,
       PRODUCT_NAME: appInfo.productName,
       PRODUCT_FILENAME: appInfo.productFilename,
+      APP_FILENAME: appInfo.name,
       APP_DESCRIPTION: appInfo.description,
       VERSION: version,
 
       COMPANY_NAME: appInfo.companyName,
 
-      PROJECT_DIR: this.packager.projectDir,
-      BUILD_RESOURCES_DIR: this.packager.buildResourcesDir,
+      PROJECT_DIR: packager.projectDir,
+      BUILD_RESOURCES_DIR: packager.buildResourcesDir,
     }
 
     if (iconPath != null) {
@@ -110,7 +111,7 @@ export default class NsisTarget extends Target {
       defines.MUI_UNICON = iconPath
     }
 
-    for (let [arch, file] of this.archs) {
+    for (const [arch, file] of this.archs) {
       let filePath = await file
       defines[arch === Arch.x64 ? "APP_64" : "APP_32"] = filePath
       defines[arch === Arch.x64 ? "APP_64_FILENAME" : "APP_32_FILENAME"] = path.basename(filePath);
@@ -118,14 +119,14 @@ export default class NsisTarget extends Target {
 
     const oneClick = this.options.oneClick !== false
 
-    const installerHeader = oneClick ? null : await this.packager.getResource(this.options.installerHeader, "installerHeader.bmp")
+    const installerHeader = oneClick ? null : await packager.getResource(this.options.installerHeader, "installerHeader.bmp")
     if (installerHeader != null) {
       defines.MUI_HEADERIMAGE = null
       defines.MUI_HEADERIMAGE_RIGHT = null
       defines.MUI_HEADERIMAGE_BITMAP = installerHeader
     }
 
-    const installerHeaderIcon = oneClick ? await this.packager.getResource(this.options.installerHeaderIcon, "installerHeaderIcon.ico") : null
+    const installerHeaderIcon = oneClick ? await packager.getResource(this.options.installerHeaderIcon, "installerHeaderIcon.ico") : null
     if (installerHeaderIcon != null) {
       defines.HEADER_ICO = installerHeaderIcon
     }
@@ -158,7 +159,7 @@ export default class NsisTarget extends Target {
       `/LANG=${localeId} FileDescription "${appInfo.description}"`,
       `/LANG=${localeId} FileVersion "${appInfo.buildVersion}"`,
     ]
-    use(this.packager.platformSpecificBuildOptions.legalTrademarks, it => versionKey.push(`/LANG=${localeId} LegalTrademarks "${it}"`))
+    use(packager.platformSpecificBuildOptions.legalTrademarks, it => versionKey.push(`/LANG=${localeId} LegalTrademarks "${it}"`))
 
     const commands: any = {
       OutFile: `"${installerPath}"`,
@@ -167,7 +168,7 @@ export default class NsisTarget extends Target {
       Unicode: true,
     }
 
-    if (packager.devMetadata.build.compression === "store") {
+    if (packager.config.compression === "store") {
       commands.SetCompress = "off"
       defines.COMPRESS = "off"
     }
@@ -192,16 +193,16 @@ export default class NsisTarget extends Target {
     debug(defines)
     debug(commands)
 
-    if (this.packager.options.effectiveOptionComputed != null && await this.packager.options.effectiveOptionComputed([defines, commands])) {
+    if (packager.options.effectiveOptionComputed != null && await packager.options.effectiveOptionComputed([defines, commands])) {
       return
     }
 
-    const licenseFile = await this.packager.getResource(this.options.license, "license.rtf", "license.txt")
+    const licenseFile = await packager.getResource(this.options.license, "license.rtf", "license.txt")
     if (licenseFile != null) {
       defines.LICENSE_FILE = licenseFile
     }
 
-    const customScriptPath = await this.packager.getResource(this.options.script, "installer.nsi")
+    const customScriptPath = await packager.getResource(this.options.script, "installer.nsi")
     const script = await readFile(customScriptPath || path.join(this.nsisTemplatesDir, "installer.nsi"), "utf8")
 
     if (customScriptPath == null) {
@@ -228,7 +229,7 @@ export default class NsisTarget extends Target {
     const githubArtifactName = `${appInfo.name}-Setup-${version}.exe`
     if (publishConfigs != null) {
       let sha2: string | null = null
-      for (let publishConfig of publishConfigs) {
+      for (const publishConfig of publishConfigs) {
         if (publishConfig.provider === "generic" || publishConfig.provider === "github") {
           if (sha2 == null) {
             sha2 = await sha256(installerPath)
@@ -278,7 +279,7 @@ export default class NsisTarget extends Target {
 
   private async executeMakensis(defines: any, commands: any, isInstaller: boolean, originalScript: string) {
     const args: Array<string> = (this.options.warningsAsErrors === false) ? [] : ["-WX"]
-    for (let name of Object.keys(defines)) {
+    for (const name of Object.keys(defines)) {
       const value = defines[name]
       if (value == null) {
         args.push(`-D${name}`)
@@ -288,10 +289,10 @@ export default class NsisTarget extends Target {
       }
     }
 
-    for (let name of Object.keys(commands)) {
+    for (const name of Object.keys(commands)) {
       const value = commands[name]
       if (Array.isArray(value)) {
-        for (let c of value) {
+        for (const c of value) {
           args.push(`-X${name} ${c}`)
         }
       }
@@ -317,9 +318,9 @@ export default class NsisTarget extends Target {
       script = "!include FileAssociation.nsh\n" + script
       if (isInstaller) {
         let registerFileAssociationsScript = ""
-        for (let item of fileAssociations) {
+        for (const item of fileAssociations) {
           const extensions = asArray(item.ext).map(normalizeExt)
-          for (let ext of extensions) {
+          for (const ext of extensions) {
             const customIcon = await packager.getResource(item.icon, `${extensions[0]}.ico`)
             let installedIconPath = "$appExe,0"
             if (customIcon != null) {
@@ -338,8 +339,8 @@ export default class NsisTarget extends Target {
       }
       else {
         let unregisterFileAssociationsScript = ""
-        for (let item of fileAssociations) {
-          for (let ext of asArray(item.ext)) {
+        for (const item of fileAssociations) {
+          for (const ext of asArray(item.ext)) {
             unregisterFileAssociationsScript += `  !insertmacro APP_UNASSOCIATE "${normalizeExt(ext)}" "${item.name}"\n`
           }
         }
