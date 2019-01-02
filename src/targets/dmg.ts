@@ -46,8 +46,9 @@ export class DmgTarget extends Target {
 
     const volumeName = sanitizeFileName(this.computeVolumeName(specification.title))
     //noinspection SpellCheckingInspection
+    // use only one srcfolder to avoid hdiutil hanging in some OS X, change based on electron-builder fix
+    // https://github.com/electron-userland/electron-builder/commit/db7092bd83fd4feea292e4ac3a850b2481f6898a
     await spawn("hdiutil", addVerboseIfNeed(["create",
-      "-srcfolder", backgroundDir,
       "-srcfolder", path.join(appOutDir, `${packager.appInfo.productFilename}.app`),
       "-volname", volumeName,
       "-anyowners", "-nospotlight", "-fs", "HFS+", "-fsargs", "-c c=64,a=16,e=16",
@@ -62,8 +63,8 @@ export class DmgTarget extends Target {
 
     await attachAndExecute(tempDmg, true, async () => {
       const promises = [
-        specification.background == null ? remove(`${volumePath}/.background`) : unlink(`${volumePath}/.background/DSStorePlaceHolder`),
         exec("ln", ["-s", "/Applications", `${volumePath}/Applications`]),
+        copy(path.join(backgroundDir, "" + backgroundFilename), path.join(volumePath, ".background", "" +backgroundFilename))
       ]
 
       let contents = specification.contents
