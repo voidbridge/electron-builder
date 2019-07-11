@@ -1,114 +1,87 @@
-import * as path from "path"
-import BluebirdPromise from "bluebird-lst-c"
-import { emptyDir, readdir, unlink, removeSync, readJson } from "fs-extra-p"
-import { homedir } from "os"
-import { TEST_DIR, ELECTRON_VERSION } from "./config"
+import { createHash } from "crypto"
+import { emptyDir, readJson, realpathSync, remove } from "fs-extra"
 import isCi from "is-ci"
+import { tmpdir } from "os"
+import * as path from "path"
+import { deleteOldElectronVersion, downloadAllRequiredElectronVersions } from "./downloadElectron"
 
-// we set NODE_PATH in this file, so, we cannot use 'out/awaiter' path here
-const util = require("../../../out/util/util")
+const rootDir = path.join(__dirname, "../../..")
+
+const util = require(`${rootDir}/packages/builder-util/out/util`)
 const isEmptyOrSpaces = util.isEmptyOrSpaces
 
-const downloadElectron: (options: any) => Promise<any> = BluebirdPromise.promisify(require("electron-download-tf"))
+const baseDir = process.env.APP_BUILDER_TMP_DIR || realpathSync(tmpdir())
+const APP_BUILDER_TMP_DIR = path.join(baseDir, `et-${createHash("md5").update(__dirname).digest("hex")}`)
 
-async function main() {
-  const testDir = TEST_DIR
-  await BluebirdPromise.all([
-    deleteOldElectronVersion(),
-    downloadAllRequiredElectronVersions(),
-    emptyDir(testDir),
-  ])
-
-  const exitHandler = () => {
-    removeSync(testDir)
-  }
-  process.on("SIGINT", exitHandler)
-  process.on("exit", exitHandler)
-  await runTests()
-}
-
-main()
+runTests()
   .catch(error => {
     console.error(error.stack || error)
     process.exit(1)
   })
 
-async function deleteOldElectronVersion(): Promise<any> {
-  if (!isCi) {
-    return
-  }
-
-  const cacheDir = path.join(homedir(), ".electron")
-  try {
-    const deletePromises: Array<Promise<any>> = []
-    for (const file of (await readdir(cacheDir))) {
-      if (file.endsWith(".zip") && !file.includes(ELECTRON_VERSION)) {
-        console.log(`Remove old electron ${file}`)
-        deletePromises.push(unlink(path.join(cacheDir, file)))
-      }
-    }
-    return await BluebirdPromise.all(deletePromises)
-  }
-  catch (e) {
-    if (e.code === "ENOENT") {
-      return []
-    }
-    else {
-      throw e
-    }
-  }
-}
-
-function downloadAllRequiredElectronVersions(): Promise<any> {
-  const platforms = process.platform === "win32" ? ["win32"] : ["darwin", "linux", "win32"]
-  if (process.platform === "darwin") {
-    platforms.push("mas")
-  }
-
-  const versions: Array<any> = []
-  for (const platform of platforms) {
-    const archs = (platform === "mas" || platform === "darwin") ? ["x64"] : (platform === "win32" ? ["ia32", "x64"] : ["ia32", "x64", "armv7l"])
-    for (const arch of archs) {
-      versions.push({
-        version: ELECTRON_VERSION,
-        arch: arch,
-        platform: platform,
-      })
-    }
-  }
-  return BluebirdPromise.map(versions, it => downloadElectron(it), {concurrency: 3})
-}
-
 async function runTests() {
-  const testFiles: string | null = process.env.TEST_FILES
+  process.env.BABEL_JEST_SKIP = "true"
 
-  const args = []
-  const baseForLinuxTests = ["ArtifactPublisherTest.js", "httpRequestTest.js", "RepoSlugTest.js"]
-  let skipWin = false
+  if (process.env.CIRCLECI) {
+    await emptyDir(APP_BUILDER_TMP_DIR)
+  }
+  else {
+    await Promise.all([
+      deleteOldElectronVersion(),
+      downloadAllRequiredElectronVersions(),
+      emptyDir(APP_BUILDER_TMP_DIR),
+    ])
+  }
+
+  const testFiles = process.env.TEST_FILES
+
+  const testPatterns: Array<string> = []
   if (!isEmptyOrSpaces(testFiles)) {
-    args.push(...testFiles.split(",").map(it => `${it.trim()}.js`))
-    if (process.platform === "linux") {
-      args.push(...baseForLinuxTests)
-    }
+    testPatterns.push(...testFiles!!.split(","))
   }
   else if (!isEmptyOrSpaces(process.env.CIRCLE_NODE_INDEX)) {
-    const circleNodeIndex = parseInt(process.env.CIRCLE_NODE_INDEX, 10)
-    if (circleNodeIndex === 0 || circleNodeIndex === 2) {
-      skipWin = true
-      args.push("linux.*", "BuildTest.js", "extraMetadataTest.js", "mainEntryTest.js", "globTest.js", "filesTest.js", "ignoreTest.js")
-      if (circleNodeIndex === 0) {
-        args.push("nsisUpdaterTest")
-      }
+    const circleNodeIndex = parseInt(process.env.CIRCLE_NODE_INDEX!!, 10)
+    if (circleNodeIndex === 0) {
+      testPatterns.push("debTest")
+      testPatterns.push("fpmTest")
+      testPatterns.push("winPackagerTest")
+      testPatterns.push("winCodeSignTest")
+      testPatterns.push("squirrelWindowsTest")
+      testPatterns.push("nsisUpdaterTest")
+      testPatterns.push("macArchiveTest")
+      testPatterns.push("macCodeSignTest")
+      testPatterns.push("extraMetadataTest")
+      testPatterns.push("HoistedNodeModuleTest")
+      testPatterns.push("configurationValidationTest")
+      testPatterns.push("webInstallerTest")
+    }
+    else if (circleNodeIndex === 1) {
+      testPatterns.push("oneClickInstallerTest")
+    }
+    else if (circleNodeIndex === 2) {
+      testPatterns.push("snapTest")
+      testPatterns.push("macPackagerTest")
+      testPatterns.push("linuxPackagerTest")
+      testPatterns.push("msiTest")
+      testPatterns.push("ignoreTest")
+      testPatterns.push("mainEntryTest")
+      testPatterns.push("ArtifactPublisherTest")
+      testPatterns.push("RepoSlugTest")
+      testPatterns.push("portableTest")
+      testPatterns.push("globTest")
+      testPatterns.push("BuildTest")
+      testPatterns.push("linuxArchiveTest")
     }
     else {
-      args.push("windows.*", "mac.*")
-      args.push(...baseForLinuxTests)
+      testPatterns.push("PublishManagerTest")
+      testPatterns.push("assistedInstallerTest")
+      testPatterns.push("filesTest")
+      testPatterns.push("protonTest")
     }
-    console.log(`Test files for node ${circleNodeIndex}: ${args.join(", ")}`)
+    console.log(`Test files for node ${circleNodeIndex}: ${testPatterns.join(", ")}`)
   }
 
-  process.env.SKIP_WIN = skipWin
-  process.env.TEST_DIR = TEST_DIR
+  process.env.APP_BUILDER_TMP_DIR = APP_BUILDER_TMP_DIR
 
   const rootDir = path.join(__dirname, "..", "..", "..")
 
@@ -116,16 +89,80 @@ async function runTests() {
   // use custom cache dir to avoid https://github.com/facebook/jest/issues/1903#issuecomment-261212137
   config.cacheDirectory = process.env.JEST_CACHE_DIR || "/tmp/jest-electron-builder-tests"
   // no need to transform — compiled before
+  config.transform = {}
   config.transformIgnorePatterns = [".*"]
+  config.bail = process.env.TEST_BAIL === "true"
 
-  require("jest-cli").runCLI({
+  let runInBand = false
+  const scriptArgs = process.argv.slice(2)
+
+  const testPathIgnorePatterns = config.testPathIgnorePatterns
+  if (scriptArgs.length > 0) {
+    for (const scriptArg of scriptArgs) {
+      console.log(`custom opt: ${scriptArg}`)
+      if ("runInBand" === scriptArg) {
+        runInBand = true
+      }
+      else if (scriptArg.includes("=")) {
+        const equalIndex = scriptArg.indexOf("=")
+        const envName = scriptArg.substring(0, equalIndex)
+        let envValue = scriptArg.substring(equalIndex + 1)
+        if (envValue === "isCi") {
+          envValue = isCi ? "true" : "false"
+        }
+
+        process.env[envName] = envValue
+        console.log(`Custom env ${envName}=${envValue}`)
+
+        if (envName === "ALL_TESTS" && envValue === "false") {
+          config.cacheDirectory += "-basic"
+        }
+      }
+      else if (scriptArg.startsWith("skip")) {
+        if (!isCi) {
+          const suffix = scriptArg.substring("skip".length)
+          if (scriptArg === "skipArtifactPublisher") {
+            testPathIgnorePatterns.push("[\\/]{1}ArtifactPublisherTest.js$")
+            config.cacheDirectory += `-${suffix}`
+          }
+          else {
+            throw new Error(`Unknown opt ${scriptArg}`)
+          }
+        }
+      }
+      else {
+        config[scriptArg] = true
+      }
+    }
+  }
+
+  const jestOptions: any = {
     verbose: true,
-    config: config,
-    bail: process.env.TEST_BAIL === "true",
-    runInBand: process.env.RUN_IN_BAND === "true",
-    testPathPattern: args.length > 0 ? args.join("|") : null,
-  }, rootDir, (result: any) => {
-    const code = !result || result.success ? 0 : 1
-    process.on("exit", () => process.exit(code))
-  })
+    updateSnapshot: process.env.UPDATE_SNAPSHOT === "true",
+    config,
+    runInBand,
+    projects: [rootDir],
+  }
+
+  if (testPatterns.length > 0) {
+    jestOptions.testPathPattern = testPatterns
+      .map(it => it.endsWith(".js") || it.endsWith("*") ? it : `${it}\\.js$`)
+  }
+  if (process.env.CIRCLECI != null || process.env.TEST_JUNIT_REPORT === "true") {
+    jestOptions.reporters = ["default", "jest-junit"]
+  }
+
+  // console.log(JSON.stringify(jestOptions, null, 2))
+
+  const testResult = await require("jest-cli").runCLI(jestOptions, jestOptions.projects)
+  const exitCode = testResult.results == null || testResult.results.success ? 0 : testResult.globalConfig.testFailureExitCode
+  if (isCi) {
+    process.exit(exitCode)
+  }
+
+  await remove(APP_BUILDER_TMP_DIR)
+  process.exitCode = exitCode
+  if (testResult.globalConfig.forceExit) {
+    process.exit(exitCode)
+  }
 }

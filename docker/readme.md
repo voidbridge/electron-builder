@@ -1,13 +1,8 @@
-It is developer documentation. See [user documentation](https://github.com/electron-userland/electron-builder/wiki/docker).
+It is developer documentation. See [user documentation](https://www.electron.build/multi-platform-build#docker).
 
 # Build
 
-```
-docker build -t electronuserland/electron-builder docker
-docker build -t electronuserland/electron-builder:wine docker/wine
-```
-
-Or just `npm run docker-images`
+`yarn docker-images`
 
 # Notes
 

@@ -1,49 +1,82 @@
-import * as path from "path"
-import { readJson } from "fs-extra-p"
-import BluebirdPromise from "bluebird-lst-c"
+import BluebirdPromise from "bluebird-lst"
+import chalk from "chalk"
 import depCheck, { DepCheckResult } from "depcheck"
+import { readJson } from "fs-extra"
+import { promises as fs } from "fs"
+import * as path from "path"
 
-const printErrorAndExit = require("../../../out/util/promise").printErrorAndExit
+const printErrorAndExit = require("../../../packages/builder-util/out/promise").printErrorAndExit
 
-const knownUnusedDevDependencies = new Set([
-  "@develar/types",
-  "jest-cli",
-  "decompress-zip",
-  "husky",
-  "path-sort",
-  "typescript",
-  "tslint",
-  "depcheck"
+const knownUnusedDevDependencies = new Set<string>([
 ])
 
-async function main(): Promise<void> {
-  const projectDir = path.join(__dirname, "..", "..", "..")
+const knownMissedDependencies = new Set<string>([
+  "babel-core",
+  "babel-preset-env",
+  "babel-preset-stage-0",
+  "babel-preset-react",
+])
 
-  console.log(`Checking ${projectDir}`)
+const rootDir = path.join(__dirname, "../../..")
+const packageDir = path.join(rootDir, "packages")
 
-  const result = await new BluebirdPromise<DepCheckResult>(function (resolve) {
+async function check(projectDir: string, devPackageData: any): Promise<boolean> {
+  const packageName = path.basename(projectDir)
+  // console.log(`Checking ${projectDir}`)
+
+  const result = await new Promise<DepCheckResult>(resolve => {
     depCheck(projectDir, {
       ignoreDirs: [
-        "out", "test", "docs", "typings", "docker", "certs", "templates", "nsis-auto-updater", ".idea", ".github",
+        "src", "test", "docs", "typings", "docker", "certs", "templates", "vendor",
       ],
     }, resolve)
   })
 
-  if (result.dependencies.length > 0) {
-    throw new Error(`Unused dependencies: ${JSON.stringify(result.dependencies, null, 2)}`)
+  // console.log(result)
+
+  let unusedDependencies: any
+  if (packageName === "electron-builder") {
+    unusedDependencies = result.dependencies.filter(it => it !== "dmg-builder").filter(it => it !== "bluebird-lst")
+  }
+  else {
+    unusedDependencies = result.dependencies.filter(it => it !== "bluebird-lst" && it !== "@types/debug" && it !== "@types/semver")
+  }
+
+  if (unusedDependencies.length > 0) {
+    console.error(`${chalk.bold(packageName)} Unused dependencies: ${JSON.stringify(unusedDependencies, null, 2)}`)
+    return false
   }
 
   const unusedDevDependencies = result.devDependencies.filter(it => !it.startsWith("@types/") && !knownUnusedDevDependencies.has(it))
   if (unusedDevDependencies.length > 0) {
-    throw new Error(`Unused devDependencies: ${JSON.stringify(unusedDevDependencies, null, 2)}`)
+    console.error(`${chalk.bold(packageName)} Unused devDependencies: ${JSON.stringify(unusedDevDependencies, null, 2)}`)
+    return false
   }
 
-  if (result.missing.length > 0) {
-    throw new Error(`Missing devDependencies: ${JSON.stringify(result.missing, null, 2)}`)
+  delete (result.missing as any).electron
+  const toml = (result.missing as any).toml
+  if (toml != null && toml.length === 1 && toml[0].endsWith("config.js")) {
+    delete (result.missing as any).toml
+  }
+
+  for (const name of Object.keys(result.missing)) {
+    if (name === "electron-builder-squirrel-windows" || name === "electron-webpack" ||
+      (packageName === "app-builder-lib" && (name === "dmg-builder" || knownMissedDependencies.has(name) || name.startsWith("@babel/")))) {
+      delete (result.missing as any)[name]
+    }
+  }
+
+  if (Object.keys(result.missing).length > 0) {
+    console.error(`${chalk.bold(packageName)} Missing dependencies: ${JSON.stringify(result.missing, null, 2)}`)
+    return false
   }
 
   const packageData = await readJson(path.join(projectDir, "package.json"))
-  for (const name of Object.keys(packageData.devDependencies)) {
+  for (const name of Object.keys(devPackageData.devDependencies)) {
+    if (packageData.dependencies != null && packageData.dependencies[name] != null) {
+      continue
+    }
+
     const usages = result.using[name]
     if (usages == null || usages.length === 0) {
       continue
@@ -51,9 +84,20 @@ async function main(): Promise<void> {
 
     for (const file of usages) {
       if (file.startsWith(path.join(projectDir, "src") + path.sep)) {
-        throw new Error(`Dev dependency ${name} is used in the sources`)
+        console.error(`${chalk.bold(packageName)} Dev dependency ${name} is used in the sources`)
+        return false
       }
     }
+  }
+
+  return true
+}
+
+async function main(): Promise<void> {
+  const packages = (await fs.readdir(packageDir)).filter(it => !it.includes(".")).sort()
+  const devPackageData = await readJson(path.join(rootDir, "package.json"))
+  if ((await BluebirdPromise.map(packages, it => check(path.join(packageDir, it), devPackageData))).includes(false)) {
+    process.exitCode = 1
   }
 }
 

@@ -1,17 +1,21 @@
-import { assertPack, modifyPackageJson, appTwoThrows, allPlatforms } from "./helpers/packTester"
-import { move } from "fs-extra-p"
-import BluebirdPromise from "bluebird-lst-c"
+import { createTargets, DIR_TARGET, Platform } from "electron-builder"
+import { promises as fs } from "fs"
 import * as path from "path"
+import { appTwoThrows, assertPack, modifyPackageJson } from "./helpers/packTester"
 
-test("invalid main in the app package.json", appTwoThrows(/Application entry file "main.js" in the /, allPlatforms(false), {
+const packagerOptions = {
+  targets: createTargets([Platform.LINUX, Platform.MAC], DIR_TARGET)
+}
+
+test.ifLinuxOrDevMac("invalid main in the app package.json", appTwoThrows(packagerOptions, {
   projectDirCreated: projectDir => modifyPackageJson(projectDir, data => {
     data.main = "main.js"
   }, true)
 }))
 
-test("invalid main in the app package.json (no asar)", appTwoThrows(`Application entry file "main.js" does not exist. Seems like a wrong configuration.`, allPlatforms(false), {
+test.ifLinuxOrDevMac("invalid main in the app package.json (no asar)", appTwoThrows(packagerOptions, {
   projectDirCreated: projectDir => {
-    return BluebirdPromise.all([
+    return Promise.all([
       modifyPackageJson(projectDir, data => {
         data.main = "main.js"
       }, true),
@@ -22,9 +26,9 @@ test("invalid main in the app package.json (no asar)", appTwoThrows(`Application
   }
 }))
 
-test("invalid main in the app package.json (custom asar)", appTwoThrows(/Application entry file "main.js" in the ("[^"]*") does not exist\. Seems like a wrong configuration\./, allPlatforms(false), {
+test.ifLinuxOrDevMac("invalid main in the app package.json (custom asar)", appTwoThrows(packagerOptions, {
   projectDirCreated: projectDir => {
-    return BluebirdPromise.all([
+    return Promise.all([
       modifyPackageJson(projectDir, data => {
         data.main = "path/app.asar/main.js"
       }, true),
@@ -35,10 +39,10 @@ test("invalid main in the app package.json (custom asar)", appTwoThrows(/Applica
   }
 }))
 
-test("main in the app package.json (no asar)", () => assertPack("test-app", allPlatforms(false), {
+test.ifLinuxOrDevMac("main in the app package.json (no asar)", () => assertPack("test-app", packagerOptions, {
   projectDirCreated: projectDir => {
-    return BluebirdPromise.all([
-      move(path.join(projectDir, "app", "index.js"), path.join(projectDir, "app", "main.js")),
+    return Promise.all([
+      fs.rename(path.join(projectDir, "app", "index.js"), path.join(projectDir, "app", "main.js")),
       modifyPackageJson(projectDir, data => {
         data.main = "main.js"
       }, true),
@@ -49,9 +53,9 @@ test("main in the app package.json (no asar)", () => assertPack("test-app", allP
   }
 }))
 
-test("main in the app package.json (custom asar)", () => assertPack("test-app", allPlatforms(false), {
+test.ifLinuxOrDevMac("main in the app package.json (custom asar)", () => assertPack("test-app", packagerOptions, {
   projectDirCreated: projectDir => {
-    return BluebirdPromise.all([
+    return Promise.all([
       modifyPackageJson(projectDir, data => {
         data.main = "path/app.asar/index.js"
       }, true),

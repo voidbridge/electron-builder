@@ -1,61 +1,81 @@
-import { Platform } from "out"
-import { assertPack, platform, modifyPackageJson, app, appThrows, CheckingWinPackager } from "../helpers/packTester"
-import { writeFile, rename, unlink } from "fs-extra-p"
+import { Platform, DIR_TARGET } from "electron-builder"
+import { remove } from "fs-extra"
+import { promises as fs } from "fs"
 import * as path from "path"
-import BluebirdPromise from "bluebird-lst-c"
+import { CheckingWinPackager } from "../helpers/CheckingPackager"
+import { app, appThrows, assertPack, platform } from "../helpers/packTester"
 
-test.ifDevOrWinCi("beta version", app({
+test.ifWinCi("beta version", app({
   targets: Platform.WINDOWS.createTarget(["squirrel", "nsis"]),
-  appMetadata: <any>{
-    version: "3.0.0-beta.2",
+  config: {
+    extraMetadata: {
+      version: "3.0.0-beta.2",
+    },
   }
 }))
 
-test.ifNotCiMac("icon < 256", appThrows(/Windows icon size must be at least 256x256, please fix ".+/, platform(Platform.WINDOWS), {
-  projectDirCreated: projectDir => rename(path.join(projectDir, "build", "incorrect.ico"), path.join(projectDir, "build", "icon.ico"))
+test.ifNotCiMac("win zip", app({
+  targets: Platform.WINDOWS.createTarget(["zip"]),
 }))
 
-test.ifNotCiMac("icon not an image", appThrows(/Windows icon is not valid ico file, please fix ".+/, platform(Platform.WINDOWS), {
-  projectDirCreated: async (projectDir) => {
+test.ifNotCiMac.ifAll("zip artifactName", app({
+  linux: ["appimage"],
+  win: ["zip"],
+  config: {
+    //tslint:disable-next-line:no-invalid-template-strings
+    artifactName: "${productName}-${version}-${os}-${arch}.${ext}",
+  },
+}))
+
+test.ifNotCiMac("icon < 256", appThrows(platform(Platform.WINDOWS), {
+  projectDirCreated: projectDir => fs.rename(path.join(projectDir, "build", "incorrect.ico"), path.join(projectDir, "build", "icon.ico"))
+}))
+
+test.ifNotCiMac("icon not an image", appThrows(platform(Platform.WINDOWS), {
+  projectDirCreated: async projectDir => {
     const file = path.join(projectDir, "build", "icon.ico")
     // because we use hardlinks
-    await unlink(file)
-    await writeFile(file, "foo")
+    await fs.unlink(file)
+    await fs.writeFile(file, "foo")
   }
 }))
 
 test.ifMac("custom icon", () => {
-  let platformPackager: CheckingWinPackager = null
+  let platformPackager: CheckingWinPackager | null = null
   return assertPack("test-app-one", {
     targets: Platform.WINDOWS.createTarget("squirrel"),
-    platformPackagerFactory: (packager, platform, cleanupTasks) => platformPackager = new CheckingWinPackager(packager)
+    platformPackagerFactory: packager => platformPackager = new CheckingWinPackager(packager),
+    config: {
+      win: {
+        icon: "customIcon",
+      },
+    },
   }, {
-    projectDirCreated: projectDir => BluebirdPromise.all([
-      rename(path.join(projectDir, "build", "icon.ico"), path.join(projectDir, "customIcon.ico")),
-      modifyPackageJson(projectDir, data => {
-        data.build.win = {
-          icon: "customIcon"
-        }
-      })
-    ]),
+    projectDirCreated: projectDir => fs.rename(path.join(projectDir, "build", "icon.ico"), path.join(projectDir, "customIcon.ico")),
     packed: async context => {
-      expect(await platformPackager.getIconPath()).toEqual(path.join(context.projectDir, "customIcon.ico"))
+      expect(await platformPackager!!.getIconPath()).toEqual(path.join(context.projectDir, "customIcon.ico"))
     },
   })
 })
 
-it.ifDevOrLinuxCi("ev", appThrows(/certificateSubjectName supported only on Windows/, {
-  targets: Platform.WINDOWS.createTarget(["dir"]),
-  config: {
-    win: {
-      certificateSubjectName: "ev",
-    }
-  }
-}))
-
-it.ifDevOrLinuxCi("forceCodeSigning", appThrows(/App is not signed and "forceCodeSigning"/, {
-  targets: Platform.WINDOWS.createTarget(["dir"]),
-  config: {
-    forceCodeSigning: true,
-  }
-}))
+test.ifAll("win icon from icns", () => {
+  let platformPackager: CheckingWinPackager | null = null
+  return app({
+    targets: Platform.WINDOWS.createTarget(DIR_TARGET),
+    config: {
+      mac: {
+        icon: "icons/icon.icns",
+      },
+    },
+    platformPackagerFactory: packager => platformPackager = new CheckingWinPackager(packager)
+  }, {
+    projectDirCreated: projectDir => Promise.all([
+      fs.unlink(path.join(projectDir, "build", "icon.ico")),
+      remove(path.join(projectDir, "build", "icons")),
+    ]),
+    packed: async () => {
+      const file = await platformPackager!!.getIconPath()
+      expect(file).toBeDefined()
+    },
+  })()
+})

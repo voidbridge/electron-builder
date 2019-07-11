@@ -1,11 +1,9 @@
-'use strict'
+"use strict"
 
-const electron = require("electron")
-const app = electron.app
+const { app, ipcMain, BrowserWindow, Menu, Tray } = require("electron")
 const fs = require("fs")
 const path = require("path")
 
-// this should be placed at top of main.js to handle setup events quickly
 if (handleSquirrelEvent()) {
   // squirrel event handled and app will exit in 1000ms, so don't do anything else
   return;
@@ -72,17 +70,24 @@ function handleSquirrelEvent() {
   }
 }
 
-// Module to control application life.
-// Module to create native browser window.
-const BrowserWindow = electron.BrowserWindow;
-
-// Keep a global reference of the window object, if you don't, the window will
-// be closed automatically when the JavaScript object is garbage collected.
-let mainWindow;
+let mainWindow
+let tray = null
 
 function createWindow () {
+  if (process.platform === "linux" && process.env.APPDIR != null) {
+    tray = new Tray(path.join(process.env.APPDIR, "testapp.png"))
+    const contextMenu = Menu.buildFromTemplate([
+      {label: 'Item1', type: 'radio'},
+      {label: 'Item2', type: 'radio'},
+      {label: 'Item3', type: 'radio', checked: true},
+      {label: 'Item4', type: 'radio'}
+    ])
+    tray.setToolTip('This is my application.')
+    tray.setContextMenu(contextMenu)
+  }
+
   // Create the browser window.
-  mainWindow = new BrowserWindow({width: 800, height: 600});
+  mainWindow = new BrowserWindow({width: 800, height: 600, webPreferences: {nodeIntegration: true}});
 
   // and load the index.html of the app.
   mainWindow.loadURL('file://' + __dirname + '/index.html');
@@ -121,7 +126,7 @@ app.on("activate", function () {
   }
 })
 
-electron.ipcMain.on("saveAppData", () => {
+ipcMain.on("saveAppData", () => {
   try {
     // electron doesn't escape / in the product name
     fs.writeFileSync(path.join(app.getPath("appData"), "Test App ßW", "testFile"), "test")

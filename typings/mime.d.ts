@@ -1,19 +1,6 @@
 declare module "mime" {
   class Mime {
-    charsets: Charsets;
-    default_type: string;
-
-    lookup(path: string): string;
-
-    extension(mime: string): string;
-
-    load(filepath: string): void;
-
-    define(mimes: Object): void;
-  }
-
-  interface Charsets {
-    lookup(mime: string): string;
+    getType(path: string): string | null
   }
 
   const mime: Mime

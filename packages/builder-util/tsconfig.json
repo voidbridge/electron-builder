@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig-base.json",
+  "compilerOptions": {
+    "outDir": "out",
+    "rootDir": "src"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "jsdoc": {
+    "out": "../../scripts/jsdoc/out/util",
+    "access": "public"
+  }
+}

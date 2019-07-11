@@ -1,43 +1,37 @@
+osx_image: xcode10.2
+language: node_js
+
+env:
+  global:
+    - FORCE_COLOR=1
+
 matrix:
   include:
     - os: osx
-      env: TEST_FILES=BuildTest,extraMetadataTest,globTest,filesTest,ignoreTest,linux.* NODE_VERSION=6 PUBLISH_TO_NPM=true
+      env: TEST_FILES=BuildTest,extraMetadataTest,globTest,filesTest,ignoreTest,linux,windows,macIconTest
+      node_js: "10"
 
     - os: osx
-      env: TEST_FILES=windows.*,mac.* NODE_VERSION=7
+      env: TEST_FILES=CodeSignTest,macArchiveTest,macPackagerTest
+      node_js: "10"
 
     - os: osx
-      env: TEST_FILES=mac.* NODE_VERSION=6
-
-language: c
+      env: TEST_FILES=masTest,dmgTest,protonTest
+      node_js: "10"
 
 cache:
+  yarn: true
   directories:
     - node_modules
-    - $HOME/.electron
+    - $HOME/Library/Caches/electron
+    - $HOME/Library/Caches/electron-builder
     - /tmp/jest-electron-builder-tests
 
-before_install:
-  - curl -L https://dl.bintray.com/develar/bin/7za -o /tmp/7za
-  - chmod +x /tmp/7za
-  - curl -L https://dl.bintray.com/develar/bin/wine.7z -o /tmp/wine.7z
-  - /tmp/7za x -o/usr/local/Cellar -y /tmp/wine.7z
-  - brew link --overwrite fontconfig gd gnutls jasper libgphoto2 libicns libtasn1 libusb libusb-compat little-cms2 nettle openssl sane-backends webp wine git-lfs gnu-tar dpkg xz
-  - brew install freetype graphicsmagick
-  - git-lfs pull
-
 install:
-- nvm install $NODE_VERSION
-- nvm use --delete-prefix $NODE_VERSION
-- ln -sf $PWD/test/yarn.js /usr/local/bin/yarn
-- yarn install --pure-lockfile
-- if [[ "$TRAVIS_BRANCH" == "master" && "$TRAVIS_PULL_REQUEST" == "false" && "$AUTO_PUBLISH" != "false" && "$TRAVIS_TAG" == "" && "$PUBLISH_TO_NPM" == "true" ]]; then yarn add @develar/semantic-release@next --dev ; fi
+  - yarn --frozen-lockfile
 
 script:
-- yarn run test
-
-after_success:
-- if [[ "$TRAVIS_BRANCH" == "master" && "$TRAVIS_PULL_REQUEST" == "false" && "$AUTO_PUBLISH" != "false" && "$TRAVIS_TAG" == "" && "$PUBLISH_TO_NPM" == "true" ]]; then npm run semantic-release ; fi
+  - yarn test
 
 branches:
   except:

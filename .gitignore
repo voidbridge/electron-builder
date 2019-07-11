@@ -1,10 +1,6 @@
-node_modules/
+/.vscode/
+/node_modules/
 *.log
-
-#**/out/**/*
-#!**/*js.snap
-
-dist/
 
 /.idea/compiler.xml
 /.idea/encodings.xml
@@ -13,19 +9,24 @@ dist/
 /.idea/deployment.xml
 /.idea/shelf/
 
-/docs/.idea/
-
-/typings/browser/
-/typings/browser.d.ts
-/typings/main.d.ts
-
 .DS_Store
 
-/test/typings/electron-builder.d.ts
-/test/typings/electron-auto-updater.d.ts
-
-/nsis-auto-updater/out/
+/packages/*/out/
 /out/
 # to not exclude .js.snap (jest snapshots)
 /test/out/**/*.js
 /test/out/**/*.map
+/test/test-report.xml
+
+/packages/electron-builder/README.md
+#/packages/app-builder-lib/scheme.json
+
+/scripts/jsdoc/out/
+/scripts/renderer/out/
+
+electron-builder-*.d.ts
+
+/site/
+/docs/
+
+__publish.sh

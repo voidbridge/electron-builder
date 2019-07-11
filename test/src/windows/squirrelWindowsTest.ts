@@ -1,9 +1,27 @@
-import { Platform, Arch } from "out"
-import { app, modifyPackageJson, appThrows, assertPack, CheckingWinPackager, copyTestAsset } from "../helpers/packTester"
+import { Arch, Platform } from "electron-builder"
 import * as path from "path"
-import BluebirdPromise from "bluebird-lst-c"
+import { CheckingWinPackager } from "../helpers/CheckingPackager"
+import { app, assertPack, copyTestAsset } from "../helpers/packTester"
 
-test.ifNotCiMac("Squirrel.Windows", app({targets: Platform.WINDOWS.createTarget(["squirrel", "zip"])}, {signed: true}))
+
+test.ifAll.ifNotCiMac("Squirrel.Windows", app({
+  targets: Platform.WINDOWS.createTarget(["squirrel"]),
+  config: {
+    win: {
+      compression: "normal",
+    }
+  }
+}, {signedWin: true}))
+
+test.ifAll.ifNotCiMac("artifactName", app({
+  targets: Platform.WINDOWS.createTarget(["squirrel", "zip"]),
+  config: {
+    win: {
+      // tslint:disable:no-invalid-template-strings
+      artifactName: "Test ${name} foo.${ext}",
+    }
+  }
+}))
 
 // very slow
 test.skip("delta and msi", app({
@@ -16,42 +34,20 @@ test.skip("delta and msi", app({
   },
 }))
 
-test.ifNotCiMac("msi as string", appThrows(/msi expected to be boolean value, but string '"false"' was specified/, {targets: Platform.WINDOWS.createTarget("squirrel")}, {
-  projectDirCreated: it => modifyPackageJson(it, data => {
-    data.build.win = {
-      msi: "false",
-    }
-  })
-}))
-
-test("detect install-spinner, certificateFile/password", () => {
-  let platformPackager: CheckingWinPackager = null
-  let loadingGifPath: string = null
+test.ifAll("detect install-spinner", () => {
+  let platformPackager: CheckingWinPackager | null = null
+  let loadingGifPath: string | null = null
 
   return assertPack("test-app-one", {
     targets: Platform.WINDOWS.createTarget("squirrel"),
-    platformPackagerFactory: (packager, platform, cleanupTasks) => platformPackager = new CheckingWinPackager(packager),
-    config: {
-      win: {
-        certificatePassword: "pass",
-      }
-    }
+    platformPackagerFactory: (packager, platform) => platformPackager = new CheckingWinPackager(packager),
   }, {
     projectDirCreated: it => {
       loadingGifPath = path.join(it, "build", "install-spinner.gif")
-      return BluebirdPromise.all([
-        copyTestAsset("install-spinner.gif", loadingGifPath),
-        modifyPackageJson(it, data => {
-          data.build.win = {
-            certificateFile: "secretFile",
-            certificatePassword: "mustBeOverridden",
-          }
-        })])
+      return copyTestAsset("install-spinner.gif", loadingGifPath)
     },
     packed: async () => {
-      expect(platformPackager.effectiveDistOptions.loadingGif).toEqual(loadingGifPath)
-      expect(platformPackager.signOptions.cert).toEqual("secretFile")
-      expect(platformPackager.signOptions.password).toEqual("pass")
+      expect(platformPackager!!.effectiveDistOptions.loadingGif).toEqual(loadingGifPath)
     },
   })
 })

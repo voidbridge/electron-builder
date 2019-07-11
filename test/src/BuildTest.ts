@@ -1,54 +1,35 @@
-import {
-  assertPack,
-  modifyPackageJson,
-  getPossiblePlatforms,
-  app,
-  appThrows,
-  packageJson,
-  appTwoThrows,
-  allPlatforms
-} from "./helpers/packTester"
-import { move, outputJson } from "fs-extra-p"
-import BluebirdPromise from "bluebird-lst-c"
+import { checkBuildRequestOptions } from "app-builder-lib"
+import { readAsar } from "app-builder-lib/out/asar/asar"
+import { doMergeConfigs } from "app-builder-lib/out/util/config"
+import { walk } from "builder-util/out/fs"
+import { Arch, createTargets, DIR_TARGET, Platform } from "electron-builder"
+import { promises as fs, readFileSync } from "fs"
+import { outputJson } from "fs-extra"
 import * as path from "path"
-import { assertThat } from "./helpers/fileAssert"
-import { BuildOptions, Platform, PackagerOptions, DIR_TARGET } from "out"
-import { normalizeOptions } from "out/builder"
-import { createYargs } from "out/cli/cliOptions"
-import { extractFile } from "asar-electron-builder"
-import { ELECTRON_VERSION } from "./helpers/config"
-import isCi from "is-ci"
-import { checkWineVersion } from "out/packager"
-import { Arch } from "out/metadata"
+import { app, appTwo, appTwoThrows, assertPack, linuxDirTarget, modifyPackageJson, packageJson, toSystemIndependentPath } from "./helpers/packTester"
+import { ELECTRON_VERSION } from "./helpers/testConfig"
 
 test("cli", async () => {
-  const yargs = createYargs()
+  // because these methods are internal
+  const { configureBuildCommand, normalizeOptions } = require("electron-builder/out/builder")
+  const yargs = require("yargs")
+  yargs.parserConfiguration({"camel-case-expansion": false})
+  configureBuildCommand(yargs)
 
-  function parse(input: string): BuildOptions {
-    return normalizeOptions(yargs.parse(input.split(" ")))
+  function parse(input: string): any {
+    const options = normalizeOptions(yargs.parse(input.split(" ")))
+    checkBuildRequestOptions(options)
+    return options
   }
-
-  function expected(opt: BuildOptions): any {
-    return Object.assign({
-      publish: undefined,
-      draft: undefined,
-      prerelease: undefined,
-      extraMetadata: undefined,
-    }, opt)
-  }
-
-  expect(parse("--platform mac")).toMatchSnapshot()
 
   expect(parse("-owl --x64 --ia32"))
   expect(parse("-mwl --x64 --ia32"))
 
-  expect(parse("--dir")).toMatchObject(expected({targets: Platform.current().createTarget(DIR_TARGET)}))
+  expect(parse("--dir")).toMatchObject({targets: Platform.current().createTarget(DIR_TARGET)})
   expect(parse("--mac --dir")).toMatchSnapshot()
-  expect(parse("--ia32 --dir")).toMatchObject(expected({targets: Platform.current().createTarget(DIR_TARGET, Arch.ia32)}))
-  expect(parse("--platform linux --dir")).toMatchSnapshot()
+  expect(parse("--x64 --dir")).toMatchObject({targets: Platform.current().createTarget(DIR_TARGET, Arch.x64)})
 
-  expect(parse("--arch x64")).toMatchObject(expected({targets: Platform.current().createTarget(null, Arch.x64)}))
-  expect(parse("--ia32 --x64")).toMatchObject(expected({targets: Platform.current().createTarget(null, Arch.x64, Arch.ia32)}))
+  expect(parse("--ia32 --x64")).toMatchObject({targets: Platform.current().createTarget(null, Arch.x64, Arch.ia32)})
   expect(parse("--linux")).toMatchSnapshot()
   expect(parse("--win")).toMatchSnapshot()
   expect(parse("-owl")).toMatchSnapshot()
@@ -56,69 +37,102 @@ test("cli", async () => {
   expect(parse("-l tar.gz:x64")).toMatchSnapshot()
   expect(parse("-l tar.gz")).toMatchSnapshot()
   expect(parse("-w tar.gz:x64")).toMatchSnapshot()
+  expect(parse("-p always -w --x64")).toMatchSnapshot()
+  expect(parse("--prepackaged someDir -w --x64")).toMatchSnapshot()
+  expect(parse("--project someDir -w --x64")).toMatchSnapshot()
 
-  function parseExtraMetadata(input: string) {
-    const result = parse(input)
-    delete result.targets
-    return result
-  }
-
-  expect(parseExtraMetadata("--em.foo=bar"))
+  expect(parse("-c.compress=store -c.asar -c ./config.json")).toMatchObject({
+    config: {
+      asar: true,
+      compress: "store",
+      extends: "./config.json"
+    }
+  })
 })
 
-// only dir - avoid DMG
-test("custom buildResources dir", app(allPlatforms(false), {
-  projectDirCreated: projectDir => BluebirdPromise.all([
-    modifyPackageJson(projectDir, data => {
-      data.directories = {
-        buildResources: "custom"
+test("merge configurations", () => {
+  const result = doMergeConfigs({
+    files: [
+      "**/*",
+      "!webpack",
+      "!.*",
+      "!config/jsdoc.json",
+      "!package.*",
+      "!docs",
+      "!private"
+    ],
+  }, {
+    files: [
+      {
+        from: ".",
+        filter: [
+          "package.json"
+        ]
+      },
+      {
+        from: "dist/main"
+      },
+      {
+        from: "dist/renderer"
+      },
+      {
+        from: "dist/renderer-dll"
       }
-    }),
-    move(path.join(projectDir, "build"), path.join(projectDir, "custom"))
-  ])
-}))
+    ],
+  })
 
-test("custom output dir", app(allPlatforms(false), {
-  projectDirCreated: packageJson(it => {
-    it.directories = {
-      output: "customDist",
-      // https://github.com/electron-userland/electron-builder/issues/601
-      app: ".",
-    }
-  }),
-  packed: async context => {
-    await assertThat(path.join(context.projectDir, "customDist")).isDirectory()
-  }
-}))
+  // console.log("data: " + JSON.stringify(result, null, 2))
+  expect(result).toMatchObject({
+    directories: {
+      output: "dist",
+      buildResources: "build"
+    },
+    files: [
+      {
+        filter: [
+          "package.json",
+          "**/*",
+          "!webpack",
+          "!.*",
+          "!config/jsdoc.json",
+          "!package.*",
+          "!docs",
+          "!private"
+        ]
+      },
+      {
+        from: "dist/main"
+      },
+      {
+        from: "dist/renderer"
+      },
+      {
+        from: "dist/renderer-dll"
+      }
+    ]
+  })
+})
 
-test("build in the app package.json", appTwoThrows(/'build' in the application package\.json .+/, allPlatforms(), {
+test("build in the app package.json", appTwoThrows({targets: linuxDirTarget}, {
   projectDirCreated: it => modifyPackageJson(it, data => {
     data.build = {
-      "iconUrl": "bar",
+      productName: "bar",
     }
   }, true)
 }))
 
-test("name in the build", appThrows(/'name' in the 'build' is forbidden/, currentPlatform(), {projectDirCreated: packageJson(it => it.build = {"name": "Cool App"})}))
-
-// this test also test appMetadata, so, we must use test-app here
-test("empty description", appTwoThrows(/Please specify 'description'/, {
-  targets: Platform.LINUX.createTarget(),
-  appMetadata: <any>{
-    description: "",
-  }
-}))
-
-test("relative index", () => assertPack("test-app", allPlatforms(false), {
+test("relative index", appTwo({
+  targets: linuxDirTarget,
+}, {
   projectDirCreated: projectDir => modifyPackageJson(projectDir, data => {
     data.main = "./index.js"
   }, true)
 }))
 
 it.ifDevOrLinuxCi("electron version from electron-prebuilt dependency", app({
-  targets: Platform.LINUX.createTarget(DIR_TARGET),
+  targets: linuxDirTarget,
 }, {
-  projectDirCreated: projectDir => BluebirdPromise.all([
+  projectDirCreated: projectDir => Promise.all([
     outputJson(path.join(projectDir, "node_modules", "electron-prebuilt", "package.json"), {
       version: ELECTRON_VERSION
     }),
@@ -130,9 +144,9 @@ it.ifDevOrLinuxCi("electron version from electron-prebuilt dependency", app({
 }))
 
 test.ifDevOrLinuxCi("electron version from electron dependency", app({
-  targets: Platform.LINUX.createTarget(DIR_TARGET),
+  targets: linuxDirTarget,
 }, {
-  projectDirCreated: projectDir => BluebirdPromise.all([
+  projectDirCreated: projectDir => Promise.all([
     outputJson(path.join(projectDir, "node_modules", "electron", "package.json"), {
       version: ELECTRON_VERSION
     }),
@@ -144,7 +158,7 @@ test.ifDevOrLinuxCi("electron version from electron dependency", app({
 }))
 
 test.ifDevOrLinuxCi("electron version from build", app({
-  targets: Platform.LINUX.createTarget(DIR_TARGET),
+  targets: linuxDirTarget,
 }, {
   projectDirCreated: projectDir => modifyPackageJson(projectDir, data => {
     data.devDependencies = {}
@@ -152,71 +166,156 @@ test.ifDevOrLinuxCi("electron version from build", app({
   })
 }))
 
-test("www as default dir", () => assertPack("test-app", currentPlatform(), {
-  projectDirCreated: projectDir => move(path.join(projectDir, "app"), path.join(projectDir, "www"))
+test("www as default dir", appTwo({
+  targets: Platform.LINUX.createTarget(DIR_TARGET),
+}, {
+  projectDirCreated: projectDir => fs.rename(path.join(projectDir, "app"), path.join(projectDir, "www"))
 }))
 
-test("afterPack", () => {
-  const targets = isCi ? Platform.fromString(process.platform).createTarget(DIR_TARGET) : getPossiblePlatforms(DIR_TARGET)
+test.ifLinuxOrDevMac("afterPack", () => {
   let called = 0
   return assertPack("test-app-one", {
-    targets: targets,
+    targets: createTargets([Platform.LINUX, Platform.MAC], DIR_TARGET),
     config: {
       afterPack: () => {
         called++
-        return BluebirdPromise.resolve()
+        return Promise.resolve()
       }
     }
   }, {
     packed: async () => {
-      expect(called).toEqual(targets.size)
+      expect(called).toEqual(2)
     }
   })
 })
 
-// ifMac("app-executable-deps", () => {
-//   return assertPack("app-executable-deps", {
-//     targets: Platform.current().createTarget(DIR_TARGET),
-//   }, {
-//     useTempDir: false,
-//     packed: async context => {
-//       const data = await readJson(path.join(context.outDir, "mac/app-executable-deps.app/Contents/Resources/app.asar.unpacked", "node_modules", "node-notifier", "package.json"))
-//       for (const name of Object.getOwnPropertyNames(data)) {
-//         if (name[0] === "_") {
-//           throw new Error("Property name starts with _")
-//         }
-//       }
-//     }
-//   })
-// })
-
-test.ifDevOrLinuxCi("smart unpack", () => {
+test.ifLinuxOrDevMac("afterSign", () => {
+  let called = 0
   return assertPack("test-app-one", {
-    targets: Platform.LINUX.createTarget(DIR_TARGET),
-  }, {
-    npmInstallBefore: true,
-    projectDirCreated: packageJson(it => {
-      it.dependencies = {
-        "debug": "^2.2.0",
-        "edge-cs": "^1.0.0"
+    targets: createTargets([Platform.LINUX, Platform.MAC], DIR_TARGET),
+    config: {
+      afterSign: () => {
+        called++
+        return Promise.resolve()
       }
-    }),
-    packed: context => {
-      expect(JSON.parse(extractFile(path.join(context.getResources(Platform.LINUX), "app.asar"), "node_modules/debug/package.json").toString())).toMatchObject({
-        name: "debug"
-      })
-      return BluebirdPromise.resolve()
+    }
+  }, {
+    packed: async () => {
+      expect(called).toEqual(2)
     }
   })
 })
 
-test("wine version", async () => {
-  await checkWineVersion(BluebirdPromise.resolve("1.9.23 (Staging)"))
-  await checkWineVersion(BluebirdPromise.resolve("2.0-rc2"))
+test.ifLinuxOrDevMac("beforeBuild", () => {
+  let called = 0
+  return assertPack("test-app-one", {
+    targets: createTargets([Platform.LINUX, Platform.MAC], DIR_TARGET),
+    config: {
+      npmRebuild: true,
+      beforeBuild: async () => {
+        called++
+      }
+    }
+  }, {
+    packed: async () => {
+      expect(called).toEqual(2)
+    }
+  })
 })
 
-function currentPlatform(): PackagerOptions {
-  return {
-    targets: Platform.fromString(process.platform).createTarget(DIR_TARGET),
-  }
+// https://github.com/electron-userland/electron-builder/issues/1738
+test.ifDevOrLinuxCi("win smart unpack", () => {
+  // test onNodeModuleFile hook
+  const nodeModuleFiles: Array<string> = []
+  let p = ""
+  return app({
+    targets: Platform.WINDOWS.createTarget(DIR_TARGET),
+    config: {
+      npmRebuild: true,
+      onNodeModuleFile: file => {
+        const name = toSystemIndependentPath(path.relative(p, file))
+        if (!name.startsWith(".") && !name.endsWith(".dll") && name.includes(".")) {
+          nodeModuleFiles.push(name)
+        }
+      },
+    },
+  }, {
+    projectDirCreated: projectDir => {
+      p = projectDir
+      return packageJson(it => {
+        it.dependencies = {
+          debug: "3.1.0",
+          "edge-cs": "1.2.1",
+          "@electron-builder/test-smart-unpack": "1.0.0",
+          "@electron-builder/test-smart-unpack-empty": "1.0.0",
+        }
+      })(projectDir)
+    },
+    packed: async context => {
+      await verifySmartUnpack(context.getResources(Platform.WINDOWS))
+      expect(nodeModuleFiles).toMatchSnapshot()
+    }
+  })()
+})
+
+export function removeUnstableProperties(data: any) {
+  return JSON.parse(JSON.stringify(data, (name, value) => {
+    if (name === "offset") {
+      return undefined
+    }
+    else if (name.endsWith(".node") && value.size != null) {
+      // size differs on various OS
+      value.size = "<size>"
+      return value
+    }
+    return value
+  }))
 }
+
+async function verifySmartUnpack(resourceDir: string) {
+  const asarFs = await readAsar(path.join(resourceDir, "app.asar"))
+  expect(await asarFs.readJson(`node_modules${path.sep}debug${path.sep}package.json`)).toMatchObject({
+    name: "debug"
+  })
+  expect(removeUnstableProperties(asarFs.header)).toMatchSnapshot()
+
+  const files = (await walk(resourceDir, file => !path.basename(file).startsWith(".") && !file.endsWith(`resources${path.sep}inspector`)))
+    .map(it => {
+      const name = toSystemIndependentPath(it.substring(resourceDir.length + 1))
+      if (it.endsWith("package.json")) {
+        return {name, content: readFileSync(it, "utf-8")}
+      }
+      return name
+    })
+  expect(files).toMatchSnapshot()
+}
+
+// https://github.com/electron-userland/electron-builder/issues/1738
+test.ifAll.ifDevOrLinuxCi("posix smart unpack", app({
+  targets: linuxDirTarget,
+  config: {
+    // https://github.com/electron-userland/electron-builder/issues/3273
+    // tslint:disable-next-line:no-invalid-template-strings
+    copyright: "Copyright © 2018 ${author}",
+    npmRebuild: true,
+    files: [
+      // test ignore pattern for node_modules defined as file set filter
+      {
+        filter: "!node_modules/napi-build-utils/napi-build-utils-1.0.0.tgz",
+      }
+    ]
+  }
+}, {
+  projectDirCreated: packageJson(it => {
+    it.dependencies = {
+      debug: "4.1.1",
+      "edge-cs": "1.2.1",
+      // no prebuilt for electron 3
+      // "lzma-native": "3.0.10",
+      keytar: "4.11.0",
+    }
+  }),
+  packed: context => {
+    expect(context.packager.appInfo.copyright).toBe("Copyright © 2018 Foo Bar")
+    return verifySmartUnpack(context.getResources(Platform.LINUX))
+  }}))
