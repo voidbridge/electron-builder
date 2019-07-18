@@ -39,7 +39,7 @@
   ${if} $0 == "Cancelled"
     quit
   ${elseif} $0 != "OK"
-    Messagebox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Unable to download application package from $packageUrl (status: $0).$\r$\n$\r$\nPlease check you Internet connection and retry." IDRETRY download
+    Messagebox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Unable to download application package (status: $0).$\r$\n$\r$\nPlease check you Internet connection and retry." IDRETRY download
     Quit
   ${endif}
 
