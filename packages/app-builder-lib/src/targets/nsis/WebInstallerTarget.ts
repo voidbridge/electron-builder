@@ -34,6 +34,10 @@ export class WebInstallerTarget extends NsisTarget {
     }
 
     defines.APP_PACKAGE_URL = appPackageUrl
+
+    if (options.appPackageHeaderHost != null) {
+      defines.APP_PACKAGE_HEADER_HOST = options.appPackageHeaderHost;
+    }
   }
 
   protected get installerFilenamePattern(): string {

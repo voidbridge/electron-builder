@@ -27,8 +27,14 @@
     StrCpy $packageArch "32"
   ${endif}
 
+  !ifdef APP_PACKAGE_HEADER_HOST
+    !define CUSTOM_HEADER_HOST '/HEADER "Host: ${APP_PACKAGE_HEADER_HOST}"'
+  !else
+    !define CUSTOM_HEADER_HOST ''
+  !endif
+
   download:
-  inetc::get /USERAGENT "electron-builder (Mozilla)" /header "X-Arch: $packageArch" /RESUME "" "$packageUrl" "$PLUGINSDIR\package.7z" /END
+  inetc::get /USERAGENT "electron-builder (Mozilla)" /header "X-Arch: $packageArch" ${CUSTOM_HEADER_HOST} /RESUME "" "$packageUrl" "$PLUGINSDIR\package.7z" /END
   Pop $0
   ${if} $0 == "Cancelled"
     quit

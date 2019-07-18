@@ -191,6 +191,11 @@ export interface NsisWebOptions extends NsisOptions {
   readonly appPackageUrl?: string | null
 
   /**
+   * The `Host` header for the application package download URL. Optional - by default uses the URL's host.
+   */
+  readonly appPackageHeaderHost?: string | null
+
+  /**
    * The [artifact file name template](/configuration/configuration#artifact-file-name-template). Defaults to `${productName} Web Setup ${version}.${ext}`.
    */
   readonly artifactName?: string | null
