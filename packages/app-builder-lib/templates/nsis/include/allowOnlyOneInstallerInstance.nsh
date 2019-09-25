@@ -55,7 +55,7 @@
 
       doStopProcess:
 
-      DetailPrint `Closing running "${PRODUCT_NAME}"...`
+      DetailPrint `$(APP_RUNNING_CLOSING)`
 
       # https://github.com/electron-userland/electron-builder/issues/2516#issuecomment-372009092
       nsExec::Exec `taskkill /im "${APP_EXECUTABLE_FILENAME}" /fi "PID ne $pid"` $R0
@@ -69,7 +69,7 @@
         # do not use /t tree kill - app was killed softly already
         nsExec::Exec `taskkill /f /im "${APP_EXECUTABLE_FILENAME}" /fi "PID ne $pid"` $R0
         ${If} $R0 != 0
-          DetailPrint `Waiting for "${PRODUCT_NAME}" to close (taskkill exit code $R0).`
+          DetailPrint `$(APP_RUNNING_WAITING) (taskkill exit code $R0).`
           Sleep 2000
         ${endIf}
       ${endIf}

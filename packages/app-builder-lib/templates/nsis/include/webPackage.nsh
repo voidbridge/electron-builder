@@ -34,14 +34,15 @@
   !endif
 
   !define FLAGS '/POPUP "package.7z" /NOCANCEL'
+  !define I18N '/CAPTION "$(DOWNLOAD_CAPTION)" /RESUME "$(DOWNLOAD_RESUME)" /TRANSLATE "$(DOWNLOAD_URL)" "$(DOWNLOAD_DOWNLOADING)" "$(DOWNLOAD_CONNECTING)" "$(DOWNLOAD_FILE_NAME)" "$(DOWNLOAD_RECEIVED)" "$(DOWNLOAD_FILE_SIZE)" "$(DOWNLOAD_REMAINING_TIME)" "$(DOWNLOAD_TOTAL_TIME)"'
 
   download:
-  inetc::get ${FLAGS} /USERAGENT "electron-builder (Mozilla)" /header "X-Arch: $packageArch" ${CUSTOM_HEADER_HOST} /RESUME "" "$packageUrl" "$PLUGINSDIR\package.7z" /END
+  inetc::get ${FLAGS} ${I18N} /USERAGENT "electron-builder (Mozilla)" /header "X-Arch: $packageArch" ${CUSTOM_HEADER_HOST} /RESUME "" "$packageUrl" "$PLUGINSDIR\package.7z" /END
   Pop $0
   ${if} $0 == "Cancelled"
     quit
   ${elseif} $0 != "OK"
-    Messagebox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Unable to download application package (status: $0).$\r$\n$\r$\nPlease check you Internet connection and retry." IDRETRY download
+    Messagebox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(DOWNLOAD_ERROR) (status: $0)." IDRETRY download
     Quit
   ${endif}
 
