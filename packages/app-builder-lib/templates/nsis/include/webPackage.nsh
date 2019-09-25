@@ -33,8 +33,10 @@
     !define CUSTOM_HEADER_HOST ''
   !endif
 
+  !define FLAGS '/POPUP "package.7z" /NOCANCEL'
+
   download:
-  inetc::get /USERAGENT "electron-builder (Mozilla)" /header "X-Arch: $packageArch" ${CUSTOM_HEADER_HOST} /POPUP "package.7z" /RESUME "" "$packageUrl" "$PLUGINSDIR\package.7z" /END
+  inetc::get ${FLAGS} /USERAGENT "electron-builder (Mozilla)" /header "X-Arch: $packageArch" ${CUSTOM_HEADER_HOST} /RESUME "" "$packageUrl" "$PLUGINSDIR\package.7z" /END
   Pop $0
   ${if} $0 == "Cancelled"
     quit
