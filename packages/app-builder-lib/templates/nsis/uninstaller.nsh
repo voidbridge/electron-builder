@@ -1,4 +1,8 @@
 Function un.onInit
+  !ifdef DISPLAY_LANG_SELECTOR
+    !insertmacro MUI_LANGDLL_DISPLAY
+  !endif
+
   !insertmacro check64BitAndSetRegView
 
   ${IfNot} ${Silent}
