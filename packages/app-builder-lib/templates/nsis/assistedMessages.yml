@@ -18,6 +18,9 @@ chooseInstallationOptions:
   es: Elegir opciones de instalación
   da: Vælg Installeringsmuligheder
   ja: インストールオプションの選択
+  zh_TW: 選擇安裝選項
+  vi_VN: Chọn cài đặt tùy chọn
+  id_ID: Pilih Opsi Pemasangan
 chooseUninstallationOptions:
   en: Choose Uninstallation Options
   de: Deinstallationsoption wählen
@@ -37,6 +40,9 @@ chooseUninstallationOptions:
   es: Elegir opciones de desinstalación
   da: Vælg Afinstalleringsmuligheder
   ja: アンインストールオプションの選択
+  zh_TW: 選擇卸載選項
+  vi_VN: Chọn Cách Gỡ Cài Đặt
+  id_ID: Pilih Opsi Hapus Pemasangan
 whichInstallationShouldBeRemoved:
   en: Which installation should be removed?
   de: Welche Installation soll entfernt werden?
@@ -56,6 +62,9 @@ whichInstallationShouldBeRemoved:
   es: ¿Qué tipo de instalación debe eliminarse?
   da: Hvilken installering skal fjernes?
   ja: どれをアンインストールしますか？
+  zh_TW: 應該刪除哪個安裝程序？
+  vi_VN: Nên gỡ bỏ cài đặt nào?
+  id_ID: Pemasangan manakah yang akan dihapus?
 whoShouldThisApplicationBeInstalledFor:
   en: Who should this application be installed for?
   de: Für wen soll diese Anwendung installiert werden?
@@ -75,6 +84,9 @@ whoShouldThisApplicationBeInstalledFor:
   es: ¿Para quién se instalará esta aplicación?
   da: Hvem skal denne applikation installeres til?
   ja: どのユーザーにインストールしますか？
+  zh_TW: 本應用程序為誰而安裝？
+  vi_VN: Ứng dụng này nên được cài đặt cho ai?
+  id_ID: Untuk siapakah aplikasi ini dipasang?
 selectUserMode:
   en: Please select whether you wish to make this software available to all users or just yourself
   de: Bitte wählen Sie, ob Sie die Anwendung nur für sich oder für alle Benutzer installieren möchten.
@@ -94,6 +106,9 @@ selectUserMode:
   es: Elige si deseas que este software esté disponible para todos los usuarios o solo para ti.
   da: Vælg, om du vil gøre denne software tilgængelig for andre brugere, eller kun for dig selv
   ja: このソフトウェアをすべてのユーザーが使用できるようにするか、現在のユーザーのみ使用するかを選択してください
+  zh_TW: 請選擇是否允許所有用戶使用該軟件還是僅您本人使用？
+  vi_VN: Vui lòng chọn xem bạn muốn cung cấp phần mềm này cho tất cả người dùng hay chỉ cho chính bạn
+  id_ID: Silakan pilih apakah Anda ingin membuat perangkat lunak ini tersedia untuk semua pengguna atau hanya untuk Anda sendiri
 whichInstallationRemove:
   en: This software is installed both per-machine (all users) and per-user.\nWhich installation you wish to remove?
   de: Die Anwendung wurde für alle Benutzer und pro Benutzer installiert.\nWelche Installation möchten Sie entfernen?
@@ -113,6 +128,9 @@ whichInstallationRemove:
   es: Este software se ha instalado para la máquina (todos los usuarios) y para el usuario.\n¿Qué instalación quieres eliminar?
   da: Denne software er installeret både pr. maskine (alle brugere) og pr. bruger./nHvilken installering ønsker du at fjerne?
   ja: このソフトウェアは、マシンごと（すべてのユーザー）とユーザーごとにインストールされています。\ nどちらを削除しますか？
+  zh_TW: 該軟件適用於每個用戶和每臺機器（所有用戶）。\n您希望移除哪個安裝程序？
+  vi_VN: Phần mềm này được cài đặt cả trên mỗi máy (tất cả người dùng) và mỗi người dùng. \nCài đặt nào bạn muốn xóa?
+  id_ID: Perangkat lunak ini dipasang per-mesin (semua pengguna) dan per-pengguna. \n Pemasangan mana yang ingin Anda hapus?
 freshInstallForAll:
   en: Fresh install for all users. (will prompt for admin credentials)
   de: Neuinstallation für alle Benutzer durchführen. (Administratorrechte benötigt)
@@ -132,6 +150,9 @@ freshInstallForAll:
   es: Instalación nueva para todos los usuarios (se pedirán los credenciales del administrador)
   da: Ny installering til alle brugere. (Vil medføre administrations-legitimationsoplysninger)
   ja: すべてのユーザーに新規インストール（管理者権限が必要）
+  zh_TW: 為所有用戶全新安裝（將提示管理證書
+  vi_VN: Cài đặt mới cho tất cả người dùng. (sẽ nhắc thông tin đăng nhập của quản trị viên)
+  id_ID: Pemasangan baru untuk semua pengguna. (diperlukan kredensial admin)
 freshInstallForCurrent:
   en: Fresh install for current user only.
   de: Neuinstallation nur für den aktuellen Benutzer durchführen.
@@ -150,6 +171,9 @@ freshInstallForCurrent:
   es: Instalación nueva solo para el usuario actual.
   da: Ny installering kun til nuværende bruger.
   ja: 現在のユーザーのみ新規インストール
+  zh_TW: 僅為現有用戶全新安裝。
+  vi_VN: Cài đặt mới chỉ dành cho người dùng hiện tại.
+  id_ID: Pemasangan baru untuk pengguna saat ini saja
 onlyForMe:
   en: Only for &me
   de: Nur für &mich
@@ -169,6 +193,9 @@ onlyForMe:
   es: Solo para mí.
   da: Kun til mig
   ja: 現在のユーザーのみにインストールする
+  zh_TW: 僅為我
+  vi_VN: Chỉ dành cho tôi
+  id_ID: Hanya untuk &saya
 forAll:
   en: Anyone who uses this computer (&all users)
   de: Für alle Benutzer dieses Computers (&alle Benutzer)
@@ -188,6 +215,9 @@ forAll:
   es: Cualquiera que utilice este ordenador (todos los usuarios)
   da: Enhver, der bruger denne computer (alle brugere)
   ja: このコンピューターを使用しているすべてのユーザー用にインストールする
+  zh_TW: 使用本電腦的所有人（&所有用戶）
+  vi_VN: Bất cứ ai sử dụng máy tính này (& tất cả người dùng)
+  id_ID: Siapapun yang menggunakan komputer ini (&semua pengguna)
 loginWithAdminAccount:
   en: You need to login with an account that is a member of the admin group to continue...
   de: Um die Installation fortzusetzen müssen Sie sich mit einem Administrator-Account anmelden...
@@ -207,6 +237,9 @@ loginWithAdminAccount:
   es: Para continuar, tienes que iniciar sesión con una cuenta que pertenezca al grupo de administradores...
   da: Du skal logge ind med en konto, der er medlem af administrationsgruppen for at kunne fortsætte...
   ja: 続行するには、管理者権限アカウントでログインする必要があります...
+  zh_TW: 您需用管理員身份的賬戶進行登錄以便繼續。
+  vi_VN: Bạn cần đăng nhập bằng tài khoản thành viên của nhóm quản trị để tiếp tục ...
+  id_ID: Anda harus login dengan akun yang merupakan anggota grup admin untuk melanjutkan ...
 perUserInstallExists:
   en: There is already a per-user installation.
   de: Es existiert bereits eine Installtion für den ausgewählten Benutzer.
@@ -225,6 +258,9 @@ perUserInstallExists:
   es: Ya hay una instalación por usuario.
   da: Der er allerede en pr. bruger installation.
   ja: すでに現在のユーザーにインストールされています。
+  zh_TW: 已為每個用戶安裝
+  vi_VN: Hiện đã có cài đặt cho mỗi người dùng.
+  id_ID: Sudah terdapat pemasangan per pengguna.
 perUserInstall:
   en: There is a per-user installation.
   de: Benutzerinstallation bereits vorhanden.
@@ -243,6 +279,9 @@ perUserInstall:
   es: Hay una instalación por usuario.
   da: Der er en pr. bruger installation.
   ja: ユーザーごとのインストールがあります。
+  zh_TW: 每個用戶安裝
+  vi_VN: Có một cài đặt cho mỗi người dùng.
+  id_ID: Terdapat pemasangan per pengguna.
 perMachineInstallExists:
   en: There is already a per-machine installation.
   de: Es existiert bereits eine Installation für diesen Computer.
@@ -261,6 +300,9 @@ perMachineInstallExists:
   es: Ya hay una instalación por máquina.
   da: Der er allerede en pr. maskine installation.
   ja: 既にすべてのユーザー用にインストールされています。
+  zh_TW: 已為每臺機器安裝
+  vi_VN: Hiện đã có cài đặt cho mỗi máy.
+  id_ID: Sudah terdapat pemasangan per mesin.
 perMachineInstall:
   en: There is a per-machine installation.
   de: Es existiert eine Installation für diesen Computer.
@@ -279,6 +321,9 @@ perMachineInstall:
   es: Hay una instalación por máquina.
   da: Der er en pr. maskine installation.
   ja: すべてのユーザー用のインストールがあります。
+  zh_TW: 每臺機器安裝
+  vi_VN: Có một cài đặt cho mỗi máy.
+  id_ID: Terdapat pemasangan per mesin.
 reinstallUpgrade:
   en: Will reinstall/upgrade.
   de: Die Anwendung wird aktualisiert.
@@ -297,6 +342,9 @@ reinstallUpgrade:
   es: Se reinstalará/actualizará.
   da: Reinstallerer/opgraderer.
   ja: 再インストール/アップグレードします。
+  zh_TW: 將重新安裝/升級
+  vi_VN: Sẽ cài đặt lại / nâng cấp.
+  id_ID: Akan memasang ulang / meningkatkan.
 uninstall:
   en: Will uninstall.
   de: Die Anwendung wird deinstalliert.
@@ -315,3 +363,6 @@ uninstall:
   es: Se desinstalará.
   da: Afinstallerer.
   ja: アンインストールします。
+  zh_TW: 將卸載
+  vi_VN: Sẽ gỡ cài đặt.
+  id_ID: Akan mencabut pemasangan.

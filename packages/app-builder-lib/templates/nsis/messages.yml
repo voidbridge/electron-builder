@@ -20,6 +20,9 @@ win7Required:
   fi: Windows 7 tai uudempi vaaditaan
   es: Se necesita Windows 7 o una versión superior.
   da: Windows 7 og højere er nødvendig
+  zh_TW: 要求Window7及以上版本
+  vi_VN: Yêu cầu Windows 7 trở lên
+  id_ID: Minimum Windows 7 keatas
 x64WinRequired:
   en: 64-bit Windows is required
   de: 64-Bit-Windows wird vorausgesetzt
@@ -40,6 +43,9 @@ x64WinRequired:
   fi: 64-bittinen Windows on pakollinen
   es: Windows de 64 bits es requerido
   da: 64-bit Windows er påkrævet
+  zh_TW: 要求64位Windows操作系統
+  vi_VN: Yêu cầu Windows 64-bit
+  id_ID: Minimum Windows 64-bit
 appRunning:
   en: "${PRODUCT_NAME} is running.\nClick OK to close it."
   de: "${PRODUCT_NAME} ist geöffnet. \nKlicken Sie zum Schliessen auf «OK»."
@@ -60,6 +66,9 @@ appRunning:
   fi: "${PRODUCT_NAME} on käynnissä. Napsauta OK sulkeaksesi sen."
   es: "${PRODUCT_NAME} se está ejecutando. Haz clic en Aceptar para cerrarlo."
   da: "${PRODUCT_NAME} er i gang. Klik OK for at lukke."
+  zh_TW: "${PRODUCT_NAME} 正在運行。\n點擊”確定“進行關閉。"
+  vi_VN: "${PRODUCT_NAME} đang chạy.\nNhấn OK để thoát ứng dụng."
+  id_ID: "${PRODUCT_NAME} sedang berjalan.\n Klik OK untuk menutup"
 installing:
   en: Installing, please wait...
   de: Installation läuft, bitte warten...
@@ -80,6 +89,9 @@ installing:
   fi: Asennetaan, odota...
   es: Instalando, espera un momento...
   da: Installerer, vent venligst...
+  zh_TW: 安裝中，請等待。
+  vi_VN: Đang cài đặt, vui lòng chờ…
+  id_ID: Dengan memasang, silakan tunggu...
 areYouSureToUninstall:
   en: Are you sure you want to uninstall ${PRODUCT_NAME}?
   de: Sind Sie sicher, dass Sie ${PRODUCT_NAME} deinstallieren möchten?
@@ -100,3 +112,6 @@ areYouSureToUninstall:
   fi: Oletko varma, että haluat poistaa ${PRODUCT_NAME} asennuksen?
   es: ¿Seguro que quieres desinstalar ${PRODUCT_NAME}?
   da: Er du sikker på, at du vil afinstallere ${PRODUCT_NAME}?
+  zh_TW: 您確定要安裝 ${PRODUCT_NAME}嗎？
+  vi_VN: Bạn có chắc chắn muốn tháo gỡ ${PRODUCT_NAME}?
+  id_ID: Anda yakin untuk mencabut pemasangan ${PRODUCT_NAME}?
